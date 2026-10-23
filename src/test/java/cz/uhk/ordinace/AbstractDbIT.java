@@ -1,5 +1,6 @@
 package cz.uhk.ordinace;
 
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -7,7 +8,8 @@ import org.testcontainers.containers.PostgreSQLContainer;
 
 /** Jeden Postgres kontejner sdílený všemi integračními testy. */
 @SpringBootTest
-abstract class AbstractDbIT {
+@AutoConfigureMockMvc
+public abstract class AbstractDbIT {
 
     static final PostgreSQLContainer<?> DB = new PostgreSQLContainer<>("postgres:16-alpine");
 
