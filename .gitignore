@@ -1,0 +1,15 @@
+# skryté / IDE / OS
+.DS_Store
+.claude/
+.idea/
+.vscode/
+*.iml
+
+# tajemství, build
+.env
+target/
+
+# zatím jen lokálně
+CLAUDE.md
+PPRO-*.pdf
+PPRO-*.docx
