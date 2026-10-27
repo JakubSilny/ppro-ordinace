@@ -12,6 +12,7 @@ Semestrální projekt PPRO (UHK, ZS 2026/2027), zadání A. Všechna data v syst
 - **Pacienti.** Hledání podle příjmení (bez ohledu na diakritiku) nebo telefonu, karta s historií, hlídání duplicit a vyřazení z evidence místo smazání.
 - **Návštěvy a výkony.** Výkony z číselníku, u počitatelných výkonů s počtem. Body se při zápisu zmrazí a chybný zápis se stornuje, nemaže.
 - **Nepřítomnost lékaře.** Dotčené rezervace se označí a objeví se v seznamu **K přeobjednání**.
+- **Rozpis dne** pro lékaře k vytištění: kdo přijde, kdy, s jakým důvodem a s telefonem.
 - **Měsíční výkaz** pro lékaře: souhrn podle výkonu, jednotlivé výkony, součet bodů, export do CSV pro Excel a tisk.
 - **Přehled rušení.** Kdo ruší nebo nechodí ve zvoleném období.
 - **Ochrana osobních údajů.** Přihlášení, záznam přístupů ke kartě pacienta a export všech údajů pacienta (viz níže).
@@ -37,9 +38,11 @@ S profilem `demo` (výchozí v `.env.example`) se navíc založí ukázkový pro
 | Proměnná | Význam |
 |---|---|
 | `DB_NAME`, `DB_USER`, `DB_PASSWORD` | databáze |
-| `APP_USERS` | účty personálu, `jmeno:heslo` oddělené čárkou |
+| `APP_USERS` | účty personálu, `jmeno:heslo` oddělené čárkou; heslo může být bcrypt hash (viz níže) |
 | `COOKIE_SECURE` | `true`, pokud aplikace běží za HTTPS proxy |
 | `SPRING_PROFILES_ACTIVE` | `demo` = ukázková data (jen pro předvedení) |
+
+Aby heslo v `.env` neleželo čitelně, lze místo něj zadat hash: `htpasswd -nbB vera 'tajne-heslo'` vypíše `vera:$2y$05$…`, do `APP_USERS` pak patří `vera:{bcrypt}$$2y$$05$$…`. Každý `$` se v `.env` pro Docker Compose zdvojuje.
 
 Pro provoz mimo jeden počítač patří aplikace za reverzní proxy s HTTPS (např. Caddy nebo nginx) a `COOKIE_SECURE=true`.
 
@@ -47,6 +50,7 @@ Pro provoz mimo jeden počítač patří aplikace za reverzní proxy s HTTPS (na
 
 ```bash
 ./mvnw verify                    # jednotkové testy + integrační testy proti PostgreSQL (Testcontainers, potřebuje Docker)
+                                 # pokrytí: target/site/jacoco/index.html; LayersTest hlídá směr závislostí mezi vrstvami
 ```
 
 Prohlížečové testy (Playwright) běží proti spuštěné aplikaci:
@@ -65,7 +69,7 @@ SPRING_PROFILES_ACTIVE=demo APP_USERS=e2e:e2e-password-123 docker compose up --b
 cd e2e && npm run prohlidka            # tempo: PAUSE=2500 (ms na popisek), SLOWMO=400 (ms na akci)
 ```
 
-Obojí spouští GitHub Actions při každém pushi (`.github/workflows/ci.yml`). E2E testy běží ve dvou profilech: desktop a tablet.
+GitHub Actions (`.github/workflows/ci.yml`) při každém pushi a pull requestu spouští `./mvnw verify` s reportem pokrytí, E2E testy ve dvou profilech (desktop a tablet), hledání hesel v historii (gitleaks), sken Docker image na známé zranitelnosti (Grype) a kontrolu, že PDF dokumentace není starší než její zdroj. Prohlídka pro klienta v CI neběží.
 
 ## Dokumentace
 
@@ -105,11 +109,13 @@ Chyby se vrací jako `application/problem+json`: 404 (neexistuje), 409 (kolize, 
 Systém zpracovává zdravotní údaje (zvláštní kategorie podle čl. 9 GDPR), proto:
 
 - **Přístup jen po přihlášení.** Odhlášení po 30 minutách nečinnosti, cookie `HttpOnly` a `SameSite=Strict`, ochrana proti CSRF.
-- **Záznam přístupů.** Každé volání API s osobními údaji se zapíše do tabulky `audit_log` (kdo, kdy, co). Hledané výrazy se neukládají. Na kartě pacienta je vidět, kdo ji zobrazil.
+- **Záznam přístupů.** Každé volání API s osobními údaji a každý pokus o přihlášení se zapíše do tabulky `audit_log` (kdo, kdy, co). Hledané výrazy se neukládají. Na kartě pacienta je vidět, kdo ji zobrazil. Záznam nejde upravit ani smazat, hlídá to trigger v databázi.
+- **Kdo co změnil.** U rezervace je vidět, kdo ji objednal a kdo ji naposledy změnil (zrušil, přesunul, zapsal návštěvu).
+- **Ochrana přihlášení.** Po 5 špatných heslech se jméno na 5 minut zablokuje, i když existuje jen v hlavě útočníka.
 - **Právo na přístup a přenositelnost (čl. 15 a 20).** Tlačítkem „Stáhnout všechny údaje“ se stáhne JSON se všemi údaji pacienta, rezervacemi a návštěvami.
 - **Výmaz.** Zdravotnickou dokumentaci je nutné uchovávat po zákonem stanovenou dobu (vyhláška č. 98/2012 Sb.), proto se pacient nemaže, jen vyřadí z evidence.
 - **Minimalizace.** Evidují se jen údaje nutné pro objednání a vykázání péče (bez rodného čísla a adresy).
-- **Technická opatření.** Content-Security-Policy bez inline skriptů, databáze dostupná jen lokálně, kontejner běží pod neprivilegovaným uživatelem, hesla jen v proměnných prostředí. Žádné externí zdroje, takže prohlížeč nekomunikuje s nikým dalším.
+- **Technická opatření.** Content-Security-Policy bez inline skriptů, databáze dostupná jen lokálně, kontejner běží pod neprivilegovaným uživatelem s jen pro čtení souborovým systémem a bez linuxových oprávnění, hesla jen v proměnných prostředí (případně jako bcrypt hash). Žádné externí zdroje, takže prohlížeč nekomunikuje s nikým dalším.
 
 ## Rozhodnutí
 
@@ -133,7 +139,7 @@ Systém zpracovává zdravotní údaje (zvláštní kategorie podle čl. 9 GDPR)
 - **P16 Mazání.** Pacienti ani lékaři se nemažou, jen vyřadí. Vyřadit nejde, dokud mají budoucí rezervace.
 - **P17–P19 Výkony.** Vazba návštěva–výkon (M:N) nese počet a body platné v době zápisu, takže změna ceníku neovlivní minulé výkazy. Jeden výkon je na návštěvě jednou, opakování se zapisuje počtem.
 - **P20 Oprava výkonu.** Stornem (`voided_at`), řádek zůstává.
-- **P21 Historie změn.** Rezervace a pacienti mají `created_at`/`updated_at` a stavy. Navíc se kvůli GDPR zaznamenává každý přístup k osobním údajům (`audit_log`).
+- **P21 Historie změn.** Rezervace a pacienti mají `created_at`/`updated_at` a stavy, rezervace navíc autora a posledního, kdo ji změnil. Úplnou historii verzí nevedeme. Kvůli GDPR se zaznamenává každý přístup k osobním údajům (`audit_log`, jen pro zápis).
 - **P22 Výkaz.** Jen z dokončených návštěv a nestornovaných výkonů. Souhrn podle kódu, jednotlivé řádky s číslem pojištěnce a export do CSV.
 - **P23 Volné termíny.** Pro lékaře, týden a délku termínu se počítají souvislá volná okna (ordinační hodiny minus rezervace, nepřítomnosti a uplynulý čas).
 - **N1 Rozhraní.** Jedna stránka pro recepci s velkými ovládacími prvky a písmem pro snadné čtení, rychlým hledáním pacienta v horní liště a podporou tabletu.
