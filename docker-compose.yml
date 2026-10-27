@@ -24,6 +24,7 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       APP_USERS: ${APP_USERS}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-}
     ports:
       - "8080:8080"
     restart: unless-stopped

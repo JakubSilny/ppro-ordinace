@@ -32,11 +32,14 @@ Aplikace poběží na **http://localhost:8080**. Přihlašovací jména a hesla 
 
 Databáze PostgreSQL je dostupná jen z tohoto počítače (`127.0.0.1:5432`). Schéma i výchozí data (číselníky, lékaři, 100 syntetických pacientů) založí migrace Flyway při prvním startu.
 
+S profilem `demo` (výchozí v `.env.example`) se navíc založí ukázkový provoz: 30 dalších pacientů, asi 8 týdnů proběhlých návštěv s výkony, zrušené a vynechané termíny (paní Krátká ruší opakovaně), objednaní pacienti na 2 týdny dopředu, dovolená a školení lékaře s rezervacemi k přeobjednání. Časy se počítají od prvního spuštění. Pro ostrý provoz proměnnou `SPRING_PROFILES_ACTIVE` smažte.
+
 | Proměnná | Význam |
 |---|---|
 | `DB_NAME`, `DB_USER`, `DB_PASSWORD` | databáze |
 | `APP_USERS` | účty personálu, `jmeno:heslo` oddělené čárkou |
 | `COOKIE_SECURE` | `true`, pokud aplikace běží za HTTPS proxy |
+| `SPRING_PROFILES_ACTIVE` | `demo` = ukázková data (jen pro předvedení) |
 
 Pro provoz mimo jeden počítač patří aplikace za reverzní proxy s HTTPS (např. Caddy nebo nginx) a `COOKIE_SECURE=true`.
 
