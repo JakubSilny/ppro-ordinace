@@ -5,8 +5,9 @@ services:
       POSTGRES_DB: ${DB_NAME}
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
+    # databáze jen pro tento počítač, ne do sítě
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - dbdata:/var/lib/postgresql/data
     healthcheck:
@@ -21,8 +22,11 @@ services:
       DB_URL: jdbc:postgresql://db:5432/${DB_NAME}
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
+      APP_USERS: ${APP_USERS}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
     ports:
       - "8080:8080"
+    restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy

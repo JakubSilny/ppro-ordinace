@@ -65,6 +65,11 @@ public class VisitService {
         return detail(visit);
     }
 
+    @Transactional(readOnly = true)
+    public Optional<VisitDetail> findByAppointment(long appointmentId) {
+        return visits.findByAppointmentId(appointmentId).map(this::detail);
+    }
+
     @Transactional
     public VisitDetail updateNote(long visitId, String note) {
         Visit visit = get(visitId);
