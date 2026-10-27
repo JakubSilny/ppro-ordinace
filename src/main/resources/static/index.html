@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ordinace Na Vyhlídce</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/assets/app.css">
+  <script src="/assets/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Přeskočit na obsah</a>
+  <header class="topbar">
+    <a class="brand" href="#diar">
+      <img src="/favicon.svg" alt="" width="28" height="28">
+      <span>Ordinace Na Vyhlídce</span>
+    </a>
+    <nav class="tabs" aria-label="Hlavní menu">
+      <a href="#diar" data-view="diar">Diář</a>
+      <a href="#pacienti" data-view="pacienti">Pacienti</a>
+      <a href="#preobjednat" data-view="preobjednat">K přeobjednání <span class="badge" id="rebook-count" hidden></span></a>
+      <a href="#vykazy" data-view="vykazy">Výkazy</a>
+      <a href="#ruseni" data-view="ruseni">Rušení</a>
+    </nav>
+    <div class="quick-search" role="search">
+      <label class="visually-hidden" for="global-search">Najít pacienta</label>
+      <input id="global-search" type="search" placeholder="Najít pacienta: příjmení nebo telefon" autocomplete="off"
+             aria-controls="global-results" aria-expanded="false">
+      <div id="global-results" class="results-popover" role="listbox" hidden></div>
+    </div>
+    <div class="user">
+      <span id="username" class="muted"></span>
+      <form method="post" action="/logout" id="logout-form">
+        <input type="hidden" name="_csrf">
+        <button class="btn ghost small" type="submit">Odhlásit</button>
+      </form>
+    </div>
+  </header>
+
+  <main id="main" tabindex="-1">
+    <!-- Diář -->
+    <section class="view" id="view-diar" aria-labelledby="diar-title" hidden>
+      <h1 class="visually-hidden" id="diar-title">Diář</h1>
+      <div class="toolbar">
+        <div class="segmented" id="doctor-picker" role="group" aria-label="Lékař"></div>
+        <div class="week-nav">
+          <button class="btn icon" id="week-prev" aria-label="Předchozí týden">‹</button>
+          <button class="btn ghost small" id="week-today">Tento týden</button>
+          <button class="btn icon" id="week-next" aria-label="Další týden">›</button>
+          <h2 class="week-label" id="week-label"></h2>
+        </div>
+        <label class="inline-field">
+          <span>Délka</span>
+          <select id="duration">
+            <option value="10">10 min</option>
+            <option value="15" selected>15 min</option>
+            <option value="20">20 min</option>
+            <option value="30">30 min</option>
+            <option value="45">45 min</option>
+            <option value="60">60 min</option>
+          </select>
+        </label>
+        <div class="toolbar-actions">
+          <button class="btn" id="acute-btn">Akutní pacient</button>
+          <button class="btn ghost" id="absence-btn">Nepřítomnost lékaře</button>
+        </div>
+      </div>
+      <div class="mode-banner" id="mode-banner" role="status" hidden>
+        <span id="mode-text"></span>
+        <button class="btn ghost small" id="mode-cancel">Zrušit výběr</button>
+      </div>
+      <div class="legend" aria-hidden="true">
+        <span><i class="swatch free"></i>Volno – kliknutím objednáte</span>
+        <span><i class="swatch booked"></i>Objednáno</span>
+        <span><i class="swatch done"></i>Proběhlo</span>
+        <span><i class="swatch rebook"></i>K přeobjednání</span>
+        <span><i class="swatch absent"></i>Nepřítomnost</span>
+      </div>
+      <div class="diary-wrap">
+        <div class="diary" id="diary" aria-busy="true"></div>
+      </div>
+    </section>
+
+    <!-- Pacienti -->
+    <section class="view" id="view-pacienti" aria-labelledby="pacienti-title" hidden>
+      <div class="split">
+        <div class="pane">
+          <div class="pane-head">
+            <h1 id="pacienti-title">Pacienti</h1>
+            <button class="btn primary" id="new-patient-btn">Nový pacient</button>
+          </div>
+          <label class="field">
+            <span>Příjmení nebo telefon</span>
+            <input id="patient-search" type="search" autocomplete="off" placeholder="např. Novák nebo 777 000 012">
+          </label>
+          <ul class="list" id="patient-results" aria-live="polite"></ul>
+        </div>
+        <div class="pane card" id="patient-card" aria-live="polite">
+          <div class="empty">
+            <p>Vyhledejte pacienta podle příjmení nebo telefonu.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- K přeobjednání -->
+    <section class="view" id="view-preobjednat" aria-labelledby="preobjednat-title" hidden>
+      <div class="pane-head">
+        <h1 id="preobjednat-title">K přeobjednání</h1>
+      </div>
+      <p class="muted lead">Rezervace, které zasáhla nepřítomnost lékaře. Zavolejte pacientovi a domluvte nový termín, nebo rezervaci zrušte.</p>
+      <div id="rebook-list"></div>
+    </section>
+
+    <!-- Výkazy -->
+    <section class="view" id="view-vykazy" aria-labelledby="vykazy-title" hidden>
+      <div class="pane-head">
+        <h1 id="vykazy-title">Měsíční výkaz výkonů</h1>
+      </div>
+      <form class="filters" id="report-form">
+        <label class="field"><span>Lékař</span><select id="report-doctor" required></select></label>
+        <label class="field"><span>Měsíc</span><input id="report-month" type="month" required></label>
+        <button class="btn primary" type="submit">Zobrazit</button>
+      </form>
+      <div id="report"></div>
+    </section>
+
+    <!-- Rušení -->
+    <section class="view" id="view-ruseni" aria-labelledby="ruseni-title" hidden>
+      <div class="pane-head">
+        <h1 id="ruseni-title">Kdo ruší nebo nechodí</h1>
+      </div>
+      <form class="filters" id="stats-form">
+        <label class="field"><span>Od</span><input id="stats-from" type="date" required></label>
+        <label class="field"><span>Do</span><input id="stats-to" type="date" required></label>
+        <button class="btn primary" type="submit">Zobrazit</button>
+      </form>
+      <div id="stats"></div>
+    </section>
+  </main>
+
+  <dialog id="dialog" aria-labelledby="dialog-title">
+    <form method="dialog" class="dialog-close"><button class="btn icon" aria-label="Zavřít">×</button></form>
+    <h2 id="dialog-title"></h2>
+    <div id="dialog-body"></div>
+  </dialog>
+
+  <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+</body>
+</html>

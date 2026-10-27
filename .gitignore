@@ -13,3 +13,9 @@ target/
 CLAUDE.md
 PPRO-*.pdf
 PPRO-*.docx
+
+# lokální výstupy prohlížečových testů
+.playwright-mcp/
+e2e/node_modules/
+e2e/test-results/
+e2e/playwright-report/
