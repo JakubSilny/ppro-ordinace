@@ -71,7 +71,7 @@ jobs:
       - uses: actions/checkout@v4
       - run: docker build -t ordinace-app .
       # známé zranitelnosti v základním obrazu a v knihovnách aplikace; padá jen na opravitelné vysoké a kritické
-      - uses: anchore/scan-action@v6
+      - uses: anchore/scan-action@v7
         with:
           image: ordinace-app
           severity-cutoff: high
