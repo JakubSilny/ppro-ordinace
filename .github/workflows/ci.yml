@@ -24,6 +24,15 @@ jobs:
           cache: maven
       # jednotkové testy (surefire) i integrační *IT proti Postgresu z Testcontainers (failsafe)
       - run: ./mvnw -B verify
+      - name: Coverage summary
+        run: |
+          awk -F, 'NR > 1 { missed += $8; covered += $9 }
+            END { printf "### Pokrytí řádků testy: %.1f %%\n", 100 * covered / (missed + covered) }' \
+            target/site/jacoco/jacoco.csv >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: target/site/jacoco
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
@@ -31,6 +40,40 @@ jobs:
           path: |
             target/surefire-reports
             target/failsafe-reports
+
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # hesla a klíče nesmí být v repozitáři ani v historii
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: PDF documentation is not older than its source
+        run: |
+          md=$(git log -1 --format=%ct -- docs/dokumentace.md)
+          pdf=$(git log -1 --format=%ct -- docs/dokumentace.pdf)
+          if [ "$md" -gt "$pdf" ]; then
+            echo "::error file=docs/dokumentace.pdf::docs/dokumentace.md se změnil po posledním PDF, přegenerujte ho (README, oddíl Dokumentace)"
+            exit 1
+          fi
+
+  image-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t ordinace-app .
+      # známé zranitelnosti v základním obrazu a v knihovnách aplikace; padá jen na opravitelné vysoké a kritické
+      - uses: anchore/scan-action@v6
+        with:
+          image: ordinace-app
+          severity-cutoff: high
+          only-fixed: true
+          output-format: table
 
   e2e:
     runs-on: ubuntu-latest
