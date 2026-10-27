@@ -200,7 +200,7 @@
 
   // ---------- Navigace ----------
 
-  const VIEWS = ['diar', 'pacienti', 'preobjednat', 'vykazy', 'ruseni'];
+  const VIEWS = ['diar', 'rozpis', 'pacienti', 'preobjednat', 'vykazy', 'ruseni'];
 
   function route() {
     const [view, param] = location.hash.replace('#', '').split('/');
@@ -212,6 +212,7 @@
       else a.removeAttribute('aria-current');
     });
     if (current === 'diar') loadDiary();
+    if (current === 'rozpis') loadDay();
     if (current === 'pacienti') {
       if (param) showPatientCard(Number(param));
       else $('#patient-search').focus();
@@ -899,6 +900,33 @@
           h('button', { type: 'button', class: 'btn ghost small', text: 'Detail', onclick: () => openAppointment(a) })))))))));
   }
 
+  // ---------- Rozpis dne ----------
+
+  async function loadDay() {
+    const doctorId = Number($('#day-doctor').value);
+    const day = $('#day-date').value;
+    if (!doctorId || !day) return;
+    const appts = await run(() => api(`/api/appointments?doctorId=${doctorId}&from=${day}&to=${day}`));
+    if (!appts) return;
+    const title = `${doctorName(doctorId)}, ${fmtDateLong.format(new Date(`${day}T00:00`))}`;
+    const target = $('#day');
+    if (appts.length === 0) {
+      target.replaceChildren(h('div', { class: 'card empty' }, h('p', { text: `${title}: nikdo není objednaný.` })));
+      return;
+    }
+    target.replaceChildren(
+      h('h2', { text: title }),
+      h('div', { class: 'actions' }, h('button', { type: 'button', class: 'btn', text: 'Vytisknout', onclick: () => window.print() })),
+      h('div', { class: 'table-wrap' }, h('table', {},
+        h('thead', {}, h('tr', {}, ['Čas', 'Pacient', 'Telefon', 'Důvod', 'Stav'].map((t) => h('th', { text: t })))),
+        h('tbody', {}, appts.map((a) => h('tr', {},
+          h('td', { text: range(new Date(a.startAt), new Date(a.endAt)) }),
+          h('td', {}, h('a', { href: `#pacienti/${a.patientId}`, text: a.patientName })),
+          h('td', {}, h('a', { href: `tel:${a.patientPhone}`, text: phone(a.patientPhone) })),
+          h('td', { text: a.reason || '–' }),
+          h('td', {}, statusChip(a))))))));
+  }
+
   // ---------- Výkazy ----------
 
   async function loadReport() {
@@ -1014,6 +1042,7 @@
     $('#new-patient-btn').addEventListener('click', () => openPatientForm(null));
     $('#patient-search').addEventListener('input', patientSearch);
     $('#report-form').addEventListener('submit', (ev) => { ev.preventDefault(); loadReport(); });
+    $('#day-form').addEventListener('submit', (ev) => { ev.preventDefault(); loadDay(); });
     $('#stats-form').addEventListener('submit', (ev) => { ev.preventDefault(); loadStats(); });
     $('#logout-form').addEventListener('submit', (ev) => { ev.target.querySelector('[name=_csrf]').value = csrfToken(); });
     wireGlobalSearch();
@@ -1024,6 +1053,7 @@
 
     const now = new Date();
     $('#report-month').value = isoMonth(now);
+    $('#day-date').value = isoDate(now);
     $('#stats-from').value = `${now.getFullYear()}-01-01`;
     $('#stats-to').value = isoDate(now);
   }
@@ -1038,7 +1068,10 @@
     let saved = null;
     try { saved = Number(localStorage.getItem('doctorId')); } catch { /* jen pohodlí */ }
     state.doctorId = doctors.some((d) => d.id === saved) ? saved : doctors[0]?.id ?? null;
-    $('#report-doctor').replaceChildren(...doctors.map((d) => h('option', { value: d.id, text: `MUDr. ${d.firstName} ${d.lastName}` })));
+    const doctorOptions = () => doctors.map((d) => h('option', { value: d.id, text: `MUDr. ${d.firstName} ${d.lastName}` }));
+    $('#report-doctor').replaceChildren(...doctorOptions());
+    $('#day-doctor').replaceChildren(...doctorOptions());
+    if (state.doctorId) $('#day-doctor').value = state.doctorId;
     renderDoctorPicker();
     route();
     refreshRebookCount();

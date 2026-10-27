@@ -17,6 +17,7 @@
     </a>
     <nav class="tabs" aria-label="Hlavní menu">
       <a href="#diar" data-view="diar">Diář</a>
+      <a href="#rozpis" data-view="rozpis">Rozpis dne</a>
       <a href="#pacienti" data-view="pacienti">Pacienti</a>
       <a href="#preobjednat" data-view="preobjednat">K přeobjednání <span class="badge" id="rebook-count" hidden></span></a>
       <a href="#vykazy" data-view="vykazy">Výkazy</a>
@@ -79,6 +80,19 @@
       <div class="diary-wrap">
         <div class="diary" id="diary" aria-busy="true"></div>
       </div>
+    </section>
+
+    <!-- Rozpis dne -->
+    <section class="view" id="view-rozpis" aria-labelledby="rozpis-title" hidden>
+      <div class="pane-head">
+        <h1 id="rozpis-title">Rozpis dne</h1>
+      </div>
+      <form class="filters" id="day-form">
+        <label class="field"><span>Lékař</span><select id="day-doctor" required></select></label>
+        <label class="field"><span>Den</span><input id="day-date" type="date" required></label>
+        <button class="btn primary" type="submit">Zobrazit</button>
+      </form>
+      <div id="day"></div>
     </section>
 
     <!-- Pacienti -->
