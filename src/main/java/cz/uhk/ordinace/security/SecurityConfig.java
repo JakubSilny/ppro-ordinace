@@ -1,11 +1,14 @@
 package cz.uhk.ordinace.security;
 
 import java.util.Arrays;
+import java.util.Map;
+import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.authentication.LockedException;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -13,6 +16,7 @@ import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.ExceptionMappingAuthenticationFailureHandler;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
@@ -36,7 +40,7 @@ public class SecurityConfig {
                 .requestMatchers("/login.html", "/assets/**", "/favicon.svg").permitAll()
                 .anyRequest().authenticated())
                 .formLogin(form -> form.loginPage("/login.html").loginProcessingUrl("/login")
-                        .defaultSuccessUrl("/", true).failureUrl("/login.html?error").permitAll())
+                        .defaultSuccessUrl("/", true).failureHandler(failureHandler()).permitAll())
                 .logout(logout -> logout.logoutUrl("/logout").logoutSuccessUrl("/login.html?logout")
                         .deleteCookies("JSESSIONID"))
                 .csrf(csrf -> csrf.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
@@ -50,21 +54,33 @@ public class SecurityConfig {
         return http.build();
     }
 
+    private static ExceptionMappingAuthenticationFailureHandler failureHandler() {
+        ExceptionMappingAuthenticationFailureHandler handler = new ExceptionMappingAuthenticationFailureHandler();
+        handler.setDefaultFailureUrl("/login.html?error");
+        handler.setExceptionMappings(Map.of(LockedException.class.getName(), "/login.html?locked"));
+        return handler;
+    }
+
+    /** Heslo může být i hash, např. {@code {bcrypt}$2y$10$...}; pak se použije tak, jak je. */
     @Bean
-    UserDetailsService users(@Value("${app.users}") String users, PasswordEncoder encoder) {
+    UserDetailsService users(@Value("${app.users}") String users, PasswordEncoder encoder, LoginAttempts attempts) {
         InMemoryUserDetailsManager manager = new InMemoryUserDetailsManager();
         Arrays.stream(users.split(",")).map(String::trim).filter(s -> !s.isEmpty()).forEach(entry -> {
             int colon = entry.indexOf(':');
             if (colon < 1 || colon == entry.length() - 1) {
                 throw new IllegalStateException("APP_USERS entries must look like name:password");
             }
+            String password = entry.substring(colon + 1);
             manager.createUser(User.withUsername(entry.substring(0, colon))
-                    .password(encoder.encode(entry.substring(colon + 1))).roles("STAFF").build());
+                    .password(password.startsWith("{") ? password : encoder.encode(password)).roles("STAFF").build());
         });
         if (!manager.userExists(firstName(users))) {
             throw new IllegalStateException("Set APP_USERS, e.g. APP_USERS=recepce:a-long-password");
         }
-        return manager;
+        // zamčené jméno dostane zamčený účet, ať existuje, nebo ne; heslo se pak vůbec neověřuje
+        return username -> attempts.isLocked(username)
+                ? User.withUsername(username).password(UUID.randomUUID().toString()).accountLocked(true).build()
+                : manager.loadUserByUsername(username);
     }
 
     private static String firstName(String users) {

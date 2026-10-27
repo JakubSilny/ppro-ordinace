@@ -5,12 +5,13 @@
     error: 'Nesprávné jméno nebo heslo.',
     logout: 'Byli jste odhlášeni.',
     expired: 'Přihlášení vypršelo. Přihlaste se znovu.',
+    locked: 'Příliš mnoho špatných pokusů. Účet je na 5 minut zablokovaný.',
   };
   for (const [key, text] of Object.entries(texts)) {
     if (params.has(key)) {
       message.textContent = text;
       message.hidden = false;
-      message.classList.toggle('error', key === 'error');
+      message.classList.toggle('error', key === 'error' || key === 'locked');
     }
   }
   const fillToken = () => {

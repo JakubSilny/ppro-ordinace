@@ -52,6 +52,19 @@ class SecurityIT extends AbstractDbIT {
     }
 
     @Test
+    void repeatedWrongPasswordsLockTheNameEvenWithTheRightPassword() throws Exception {
+        for (int i = 0; i < 5; i++) {
+            anonymous.perform(formLogin("/login").user("zamek").password("wrong"))
+                    .andExpect(redirectedUrl("/login.html?error"));
+        }
+        anonymous.perform(formLogin("/login").user("zamek").password("wrong"))
+                .andExpect(redirectedUrl("/login.html?locked"));
+
+        assertThat(jdbc.queryForList("SELECT status FROM audit_log WHERE username = 'zamek' AND path = '/login'",
+                Integer.class)).containsOnly(401, 423).hasSize(6);
+    }
+
+    @Test
     void writeWithoutCsrfTokenIsRejected() throws Exception {
         anonymous.perform(post("/api/doctors").with(user("recepce")).contentType("application/json")
                 .content("{\"firstName\":\"A\",\"lastName\":\"B\"}")).andExpect(status().isForbidden());
