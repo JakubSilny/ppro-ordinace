@@ -153,7 +153,7 @@ input[aria-invalid="true"] { border-color: var(--danger); }
 }
 .tabs a:hover { background: var(--primary-soft); }
 .tabs a[aria-current="page"] { background: var(--ink); color: #fff; }
-.quick-search { position: relative; flex: 1 1 280px; max-width: 420px; margin-left: auto; }
+.quick-search { position: relative; flex: 1 1 200px; max-width: 420px; margin-left: auto; }
 .user { display: flex; align-items: center; gap: 0.5rem; }
 .user form { margin: 0; }
 

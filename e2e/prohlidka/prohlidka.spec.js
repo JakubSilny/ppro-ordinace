@@ -70,6 +70,20 @@ test('Prohlídka aplikace Ordinace Na Vyhlídce', async ({ page }) => {
     await page.getByRole('button', { name: 'Přihlásit se' }).click();
     await expect(page.getByText('Nesprávné jméno nebo heslo.')).toBeVisible();
     await caption(page, 'Se špatným heslem neprojde nikdo.');
+    // jiné jméno při každém běhu: zámek drží 5 minut a prohlídka se může pouštět opakovaně
+    const guesser = `host${Date.now() % 10000}`;
+    await caption(page, 'Kdo zkouší hesla naslepo, toho systém po pěti pokusech zastaví.');
+    for (let i = 0; i < 5; i++) {
+      await page.getByLabel('Uživatelské jméno').fill(guesser);
+      await page.getByLabel('Heslo').fill(`heslo${i}`);
+      await page.getByRole('button', { name: 'Přihlásit se' }).click();
+      await expect(page.getByText('Nesprávné jméno nebo heslo.')).toBeVisible();
+    }
+    await page.getByLabel('Uživatelské jméno').fill(guesser);
+    await page.getByLabel('Heslo').fill('heslo5');
+    await page.getByRole('button', { name: 'Přihlásit se' }).click();
+    await expect(page.getByText(/Příliš mnoho špatných pokusů/)).toBeVisible();
+    await caption(page, 'Jméno je teď 5 minut zablokované, i se správným heslem. Každý pokus se zapíše.');
     await page.getByLabel('Uživatelské jméno').fill(USER);
     await page.getByLabel('Heslo').pressSequentially(PASSWORD, { delay: 40 });
     await page.getByRole('button', { name: 'Přihlásit se' }).click();
@@ -194,6 +208,24 @@ test('Prohlídka aplikace Ordinace Na Vyhlídce', async ({ page }) => {
     await dialog.getByRole('button', { name: 'Hotovo' }).click();
   });
 
+  await test.step('Rozpis dne pro lékaře', async () => {
+    await page.getByRole('link', { name: 'Rozpis' }).click();
+    await caption(page, 'Ráno si lékař nebo recepce vytiskne rozpis dne: kdo přijde, kdy a proč.');
+    await page.locator('#day-doctor').selectOption({ label: 'MUDr. Marie Vyhlídalová' });
+    // první den v příštích dvou týdnech, kdy je někdo objednaný
+    const day = new Date();
+    for (let i = 0; i < 14; i++) {
+      await page.locator('#day-date').fill(isoDate(day));
+      await page.getByRole('button', { name: 'Zobrazit' }).click();
+      if (await page.locator('#day table').waitFor({ timeout: 1500 }).then(() => true, () => false)) break;
+      day.setDate(day.getDate() + 1);
+    }
+    await caption(page, 'Telefon na jedno kliknutí, jméno vede na kartu pacienta.');
+    await caption(page, 'Tlačítkem „Vytisknout“ vyjde jen tabulka, bez menu a tlačítek.');
+    await page.getByRole('link', { name: 'Diář' }).click();
+    await settled();
+  });
+
   await test.step('Nemoc lékaře a přeobjednání', async () => {
     await pickDoctor('MUDr. Vyhlídalová');
     await page.locator('#absence-btn').click();
@@ -240,6 +272,7 @@ test('Prohlídka aplikace Ordinace Na Vyhlídce', async ({ page }) => {
 
     await page.getByRole('button', { name: 'Kdo kartu zobrazil' }).click();
     await caption(page, 'GDPR: každé nahlédnutí do karty se zaznamená.');
+    await caption(page, 'Záznam nejde upravit ani smazat – nedovolí to ani databáze.');
     await page.keyboard.press('Escape');
     const download = page.waitForEvent('download');
     await page.getByRole('link', { name: 'Stáhnout všechny údaje' }).click();
@@ -248,6 +281,10 @@ test('Prohlídka aplikace Ordinace Na Vyhlídce', async ({ page }) => {
     await caption(page, 'Rychlé hledání v horní liště funguje odkudkoli, třeba podle telefonu.');
     await page.getByLabel('Najít pacienta').pressSequentially(patient.phone.slice(0, 6), { delay: 120 });
     await page.locator('#global-results .list-item', { hasText: patient.last }).first().click();
+    await page.locator('#patient-card .history li', { hasText: 'Zrušeno' }).first().getByRole('button').click();
+    await expect(dialog.getByText('Poslední změna')).toBeVisible();
+    await caption(page, 'U každé rezervace je vidět, kdo ji objednal a kdo ji naposledy změnil nebo zrušil.');
+    await page.keyboard.press('Escape');
 
     await page.getByRole('button', { name: 'Nový pacient' }).click();
     await dialog.getByLabel('Jméno', { exact: true }).fill(patient.first);
