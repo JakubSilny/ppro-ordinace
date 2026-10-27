@@ -1,4 +1,4 @@
-package cz.uhk.ordinace.visit.repository;
+package cz.uhk.ordinace.visit.dto;
 
 import java.time.Instant;
 

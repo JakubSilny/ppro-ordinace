@@ -19,7 +19,7 @@ import cz.uhk.ordinace.appointment.domain.AppointmentStatus;
 import cz.uhk.ordinace.appointment.dto.CreateAppointmentRequest;
 import cz.uhk.ordinace.appointment.dto.RescheduleRequest;
 import cz.uhk.ordinace.appointment.repository.AppointmentRepository;
-import cz.uhk.ordinace.appointment.repository.CancellationStat;
+import cz.uhk.ordinace.appointment.dto.CancellationStat;
 import cz.uhk.ordinace.common.BusinessRuleException;
 import cz.uhk.ordinace.common.ConflictException;
 import cz.uhk.ordinace.common.NotFoundException;

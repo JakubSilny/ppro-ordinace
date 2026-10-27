@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import cz.uhk.ordinace.visit.repository.ReportLine;
+import cz.uhk.ordinace.visit.dto.ReportLine;
 import cz.uhk.ordinace.visit.service.MonthlyReport;
 import cz.uhk.ordinace.visit.service.VisitService;
 

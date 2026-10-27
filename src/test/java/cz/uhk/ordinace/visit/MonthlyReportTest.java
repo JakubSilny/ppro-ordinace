@@ -8,7 +8,7 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
-import cz.uhk.ordinace.visit.repository.ReportLine;
+import cz.uhk.ordinace.visit.dto.ReportLine;
 
 class MonthlyReportTest {
 

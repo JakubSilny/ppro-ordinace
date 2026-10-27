@@ -19,7 +19,7 @@ import cz.uhk.ordinace.appointment.domain.Appointment;
 import cz.uhk.ordinace.appointment.dto.AppointmentResponse;
 import cz.uhk.ordinace.appointment.dto.CreateAppointmentRequest;
 import cz.uhk.ordinace.appointment.dto.RescheduleRequest;
-import cz.uhk.ordinace.appointment.repository.CancellationStat;
+import cz.uhk.ordinace.appointment.dto.CancellationStat;
 import cz.uhk.ordinace.appointment.service.AppointmentService;
 import cz.uhk.ordinace.appointment.service.TimeRange;
 import cz.uhk.ordinace.patient.domain.Patient;

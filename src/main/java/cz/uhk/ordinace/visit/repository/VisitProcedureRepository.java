@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 
 import cz.uhk.ordinace.appointment.domain.AppointmentStatus;
 import cz.uhk.ordinace.visit.domain.VisitProcedure;
+import cz.uhk.ordinace.visit.dto.ReportLine;
 
 public interface VisitProcedureRepository extends JpaRepository<VisitProcedure, Long> {
 
@@ -17,7 +18,7 @@ public interface VisitProcedureRepository extends JpaRepository<VisitProcedure, 
     boolean existsByVisitIdAndProcedureIdAndVoidedAtIsNull(long visitId, long procedureId);
 
     @Query("""
-            select new cz.uhk.ordinace.visit.repository.ReportLine(a.startAt, p.firstName, p.lastName, p.insuranceId,
+            select new cz.uhk.ordinace.visit.dto.ReportLine(a.startAt, p.firstName, p.lastName, p.insuranceId,
                 i.code, pi.code, pi.name, vp.quantity, vp.pointsAtTime)
             from VisitProcedure vp
                 join vp.procedure pi

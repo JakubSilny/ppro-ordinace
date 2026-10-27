@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
-import cz.uhk.ordinace.visit.repository.ReportLine;
+import cz.uhk.ordinace.visit.dto.ReportLine;
 
 /** Výkaz lékaře za měsíc: jednotlivé výkony, souhrn po kódu a celkový součet bodů. */
 public record MonthlyReport(long doctorId, YearMonth month, List<ReportLine> lines, List<Summary> summary,

@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 
 import cz.uhk.ordinace.appointment.domain.Appointment;
 import cz.uhk.ordinace.appointment.domain.AppointmentStatus;
+import cz.uhk.ordinace.appointment.dto.CancellationStat;
 
 public interface AppointmentRepository extends JpaRepository<Appointment, Long> {
 
@@ -32,7 +33,7 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
     List<Appointment> findByPatientIdOrderByStartAtDesc(long patientId);
 
     @Query("""
-            select new cz.uhk.ordinace.appointment.repository.CancellationStat(p.id, p.firstName, p.lastName, p.phone,
+            select new cz.uhk.ordinace.appointment.dto.CancellationStat(p.id, p.firstName, p.lastName, p.phone,
                 sum(case when a.status = cz.uhk.ordinace.appointment.domain.AppointmentStatus.CANCELLED then 1 else 0 end),
                 sum(case when a.status = cz.uhk.ordinace.appointment.domain.AppointmentStatus.NO_SHOW then 1 else 0 end))
             from Appointment a join Patient p on p.id = a.patientId
