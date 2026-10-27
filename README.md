@@ -21,15 +21,16 @@ Rozhraní je česky, ovládá se myší, klávesnicí i dotykem a funguje i na t
 
 ## Spuštění
 
-Potřebujete Docker (s Docker Compose).
+Potřebujete Git a Docker (s Docker Compose). Java ani Maven potřeba nejsou, aplikace se sestaví v Dockeru.
 
 ```bash
-cp .env.example .env
-# v .env nastavte vlastní hesla: DB_PASSWORD a účty v APP_USERS
-docker compose up --build -d
+git clone https://github.com/JakubSilny/ppro-ordinace.git
+cd ppro-ordinace
+cp .env.example .env           # pro vyzkoušení stačí beze změny
+docker compose up --build -d   # první sestavení trvá několik minut
 ```
 
-Aplikace poběží na **http://localhost:8080**. Přihlašovací jména a hesla jsou ta, která jste nastavili v `APP_USERS` (formát `jmeno:heslo,jmeno2:heslo2`). Bez nich aplikace odmítne nastartovat.
+Aplikace poběží na **http://localhost:8080**. S nezměněným `.env.example` se přihlásíte jménem **`recepce`** a heslem **`zmente-toto-heslo`**. Pro ostrý provoz nastavte v `.env` vlastní heslo databáze (`DB_PASSWORD`) a účty personálu v `APP_USERS` (formát `jmeno:heslo,jmeno2:heslo2`). Bez účtů aplikace odmítne nastartovat. Zastavení: `docker compose down`.
 
 Databáze PostgreSQL je dostupná jen z tohoto počítače (`127.0.0.1:5432`). Schéma i výchozí data (číselníky, lékaři, 100 syntetických pacientů) založí migrace Flyway při prvním startu.
 
@@ -73,15 +74,25 @@ GitHub Actions (`.github/workflows/ci.yml`) při každém pushi a pull requestu 
 
 ## Dokumentace
 
-Technická dokumentace je v `docs/dokumentace.pdf`. Její zdroj `docs/dokumentace.md` se převede příkazem:
+Dokumentace projektu je v `docs/dokumentace.pdf`: datový model s ER diagramem, architektura, technologie, spuštění, testy, protokol o zacyklení agenta a přiznání práce s AI. Zdroj je `docs/dokumentace.md`, vzhled (titulní strana, barvy, záhlaví) určuje `docs/styl.tex`. PDF se vytvoří příkazem (potřeba pandoc a XeLaTeX):
 
 ```bash
-cd docs && pandoc dokumentace.md -o dokumentace.pdf --pdf-engine=xelatex -V mainfont="Helvetica Neue" -V monofont=Menlo -V geometry:margin=2.5cm --toc
+cd docs && pandoc dokumentace.md -o dokumentace.pdf --pdf-engine=xelatex
 ```
+
+ER diagram `docs/er-diagram.png` se kreslí ze zdroje `docs/er-diagram.mmd` (Mermaid):
+
+```bash
+cd docs && docker run --rm -u $(id -u):$(id -g) -v "$PWD:/data" minlag/mermaid-cli:11.12.0 -i er-diagram.mmd -o er-diagram.png -w 1800 -b white
+```
+
+## Práce s AI
+
+Projekt vznikal s agentem Claude Code (modely Claude Sonnet 5.5 a Claude Opus 5.5). Agent podle mého zadání psal kód, testy, migrace, CI i dokumentaci; commity, na kterých se podílel, mají řádek `Co-Authored-By: Claude …`. Výsledek ověřují jednotkové, integrační a prohlížečové testy, CI při každém pushi a ruční průchod aplikací. Podrobnosti a konkrétní případ, kdy agent dodal nefunkční řešení, jsou v kapitolách 8 a 9 dokumentace.
 
 ## Architektura
 
-- **Java 21, Spring Boot 3.4** (Web, Data JPA, Validation, Security), **PostgreSQL 16**, migrace **Flyway**.
+- **Java 21, Spring Boot 3.5** (Web, Data JPA, Validation, Security), **PostgreSQL 16**, migrace **Flyway**.
 - Balíčky podle funkcí (`patient`, `doctor`, `appointment`, `visit`, `audit`, `gdpr`, `security`), uvnitř vrstvy `api` → `service` → `repository`. Controller nikdy nesahá na databázi.
 - Pravidla, která musí platit vždy, hlídá i databáze. Dvě rezervace se u lékaře ani u pacienta nepřekryjí (exclusion constraint `btree_gist`). Totéž platí pro unikátní číslo pojištěnce a pro jeden aktivní zápis výkonu na návštěvu. Při souběžném objednání tak uspěje jen jeden požadavek, i kdyby aplikační kontrola proběhla u obou zároveň.
 - Webové rozhraní je statická stránka (HTML, CSS, JavaScript bez frameworku) nad REST API. Písmo Atkinson Hyperlegible je hostované spolu s aplikací.

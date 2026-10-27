@@ -1,9 +1,24 @@
 ---
 title: "Ordinace Na Vyhlídce"
-subtitle: "Objednávací a evidenční systém pro praktické lékaře – technická dokumentace"
+subtitle: "Objednávací a evidenční systém pro praktické lékaře – dokumentace"
 author: "Jakub Silný"
-date: "Pokročilé programování (PPRO), UHK, ZS 2026/2027"
+date: "Zadání A, Aplikovaná informatika, akademický rok 2026/2027"
 lang: cs
+documentclass: article
+fontsize: 11pt
+mainfont: "Helvetica Neue"
+monofont: "Menlo"
+geometry: margin=2.5cm
+linestretch: 1.15
+toc: true
+toc-depth: 2
+numbersections: true
+colorlinks: true
+linkcolor: "primary"
+urlcolor: "primary"
+toccolor: "ink"
+header-includes:
+  - \input{styl.tex}
 ---
 
 # Úvod
@@ -21,28 +36,28 @@ Aplikace tyto činnosti nahrazuje webovým systémem pro recepci:
 
 Klíčová pravidla klienta vynucuje aplikace i databáze: dvě rezervace se nepřekryjí, mimo ordinační hodiny objednat nejde, výkon nelze zapsat před začátkem návštěvy a historie pacienta se nemaže.
 
+\newpage
+
 # Datový model
 
-Schéma je ve verzovaných migracích Flyway (`src/main/resources/db/migration`): V1 schéma, V2 číselníky a syntetická data, V3 audit přístupů.
+Schéma je ve verzovaných migracích Flyway (`src/main/resources/db/migration`): V1 schéma, V2 číselníky a syntetická data, V3 audit přístupů, V4 audit jen pro zápis a autoři rezervací. Ukázkový provoz pro předvedení přidává migrace V100 jen v profilu `demo` (`src/main/resources/db/demo`).
 
-| Entita | Význam |
-|---|---|
-| `insurer` | číselník zdravotních pojišťoven |
-| `patient` | pacient, volitelně s číslem pojištěnce a pojišťovnou |
-| `doctor` | lékař |
-| `office_hours` | týdenní šablona ordinačních hodin (den, od–do, místo, zda se objednává) |
-| `doctor_absence` | nepřítomnost lékaře (časový interval) |
-| `appointment` | rezervace pacienta u lékaře, stav, odkaz na původní rezervaci při přesunu |
-| `visit` | uskutečněná návštěva (1:1 k rezervaci) |
-| `procedure_item` | číselník výkonů (kód, název, body, zda se zadává počet) |
-| `visit_procedure` | **vazba M:N** návštěva–výkon s atributy `quantity`, `points_at_time`, `voided_at` |
-| `audit_log` | záznam přístupů k osobním údajům |
+![ER diagram. Zvýrazněná tabulka `visit_procedure` je spojovací tabulka vazby M:N mezi návštěvou a výkonem.](er-diagram.png){ height=62% }
 
-**Vazba M:N.** Na jedné návštěvě proběhne více výkonů a tentýž výkon se opakuje u mnoha návštěv. Spojovací tabulka `visit_procedure` nese vlastní atributy: počet, body zmražené v době zápisu (změna ceníku neovlivní minulé výkazy) a čas storna.
+| Entita | Význam | Klíčové atributy a vazby |
+|---|---|---|
+| `insurer` | číselník zdravotních pojišťoven | `code` (unikátní, např. 111) |
+| `patient` | pacient | `insurance_id` (nepovinné, unikátní), `phone` (jen číslice), `active` (vyřazení místo smazání); N:1 k `insurer` |
+| `doctor` | lékař | `active`; 1:N k ordinačním hodinám, absencím a rezervacím |
+| `office_hours` | týdenní šablona ordinačních hodin | `weekday`, `from_time`–`to_time`, `location`, `bookable` (zda se tam objednává) |
+| `doctor_absence` | nepřítomnost lékaře | časový interval `start_at`–`end_at`, `reason` |
+| `appointment` | rezervace pacienta u lékaře | `start_at`–`end_at`, `status` (BOOKED, COMPLETED, CANCELLED, NO_SHOW, RESCHEDULED), `needs_rebooking`, `rescheduled_from_id` (odkaz na původní rezervaci při přesunu), `created_by`/`updated_by` |
+| `visit` | uskutečněná návštěva | `appointment_id` (unikátní, tedy 1:1 k rezervaci), `note` |
+| `procedure_item` | číselník výkonů | `code` (unikátní), `points`, `countable` (zda se zadává počet) |
+| `visit_procedure` | **vazba M:N** návštěva–výkon | `quantity`, `points_at_time`, `voided_at` |
+| `audit_log` | záznam přístupů k osobním údajům | kdo (`username`), kdy (`at`), co (`method`, `path`), výsledek (`status`); jen pro zápis |
 
-![ER diagram](er-diagram.png)
-
-> TODO: vložit ER diagram (např. export z DBeaveru nebo dbdiagram.io) jako `docs/er-diagram.png`.
+**Vazba M:N.** Na jedné návštěvě proběhne více výkonů a tentýž výkon se opakuje u mnoha návštěv. Spojovací tabulka `visit_procedure` nese vlastní atributy: počet, body zmražené v době zápisu (změna ceníku neovlivní minulé výkazy) a čas storna. V JPA je zmapovaná jako samostatná entita `VisitProcedure`, ne jako `@ManyToMany`, právě kvůli těmto atributům.
 
 **Integritní omezení v databázi:**
 
@@ -84,21 +99,21 @@ Kód je rozdělený do balíčků podle funkce (`patient`, `doctor`, `appointmen
 
 Rozhraní je určené recepční, která „s počítačem moc nekamarádí“: velké ovládací prvky (min. 44 px), písmo Atkinson Hyperlegible navržené pro snadné čtení, hledání pacienta vždy po ruce v horní liště a srozumitelné české hlášky místo technických chyb.
 
-![Týdenní diář lékaře s volnými okny a objednaným pacientem](img/diar.png){ width=100% }
+![Týdenní diář lékaře s volnými okny a objednaným pacientem](img/diar.png){ width=80% }
 
-![Objednání z volného okna: hledání pacienta, začátek a délka termínu](img/objednani.png){ width=100% }
+![Objednání z volného okna: hledání pacienta, začátek a délka termínu](img/objednani.png){ width=80% }
 
-![Zápis návštěvy a výkonů, body se sčítají průběžně](img/navsteva.png){ width=100% }
+![Zápis návštěvy a výkonů, body se sčítají průběžně](img/navsteva.png){ width=80% }
 
-![Měsíční výkaz pro pojišťovnu se souhrnem a exportem do CSV](img/vykaz.png){ width=100% }
+![Měsíční výkaz pro pojišťovnu se souhrnem a exportem do CSV](img/vykaz.png){ width=80% }
 
-![Diář na tabletu](img/tablet.png){ width=60% }
+![Diář na tabletu](img/tablet.png){ width=45% }
 
 # Použité technologie
 
 | Technologie | Proč |
 |---|---|
-| Java 21, Spring Boot 3.4 | records pro DTO, konstruktorová injekce, ověřený ekosystém |
+| Java 21, Spring Boot 3.5 | Javu znám z předchozích předmětů; records pro DTO, konstruktorová injekce a hotová podpora REST, JPA, validace i testů |
 | Spring Data JPA, Hibernate | repozitáře bez ručního SQL tam, kde stačí odvozené dotazy |
 | PostgreSQL 16 | exclusion constraint nad časovými intervaly (`btree_gist`), `unaccent` pro hledání bez diakritiky |
 | Flyway | verzované migrace, stejné schéma v Dockeru i v testech |
@@ -113,12 +128,26 @@ Rozhraní je určené recepční, která „s počítačem moc nekamarádí“: 
 
 # Spuštění
 
-```bash
-cp .env.example .env      # nastavit hesla a účty v APP_USERS
-docker compose up --build -d
-```
+**Prerekvizity:** Docker Desktop (nebo Docker Engine s pluginem Docker Compose) a Git. Java ani Maven nejsou potřeba, aplikace se sestaví uvnitř Dockeru. Volné porty 8080 a 5432.
 
-Aplikace běží na `http://localhost:8080`. Podrobnosti a proměnné prostředí jsou v `README.md`.
+**Postup:**
+
+1. Stáhnout repozitář: `git clone https://github.com/JakubSilny/ppro-ordinace.git` a přejít do složky `ppro-ordinace`.
+2. Vytvořit soubor s nastavením z ukázky: `cp .env.example .env`. Pro vyzkoušení ho není nutné měnit. Pro ostrý provoz se v něm nastaví vlastní heslo databáze (`DB_PASSWORD`) a účty personálu (`APP_USERS`, formát `jmeno:heslo,jmeno2:heslo2`).
+3. Spustit aplikaci a databázi: `docker compose up --build -d`. První sestavení trvá několik minut.
+4. Ověřit, že běží: `docker compose ps` ukáže kontejnery `app` a `db` ve stavu *running (healthy)*.
+5. Otevřít v prohlížeči `http://localhost:8080` a přihlásit se.
+
+**Adresy služeb:**
+
+| Služba | Adresa |
+|---|---|
+| webová aplikace a REST API | `http://localhost:8080` (API pod `/api/…`) |
+| PostgreSQL | `127.0.0.1:5432`, databáze, uživatel a heslo podle `.env` (výchozí `ordinace` / `ordinace` / `zmente-heslo-databaze`) |
+
+**Přihlašovací údaje k testovacím datům:** s nezměněným `.env.example` jméno **`recepce`** a heslo **`zmente-toto-heslo`**. Výchozí profil `demo` založí ukázkový provoz: 130 syntetických pacientů, 8 týdnů proběhlých návštěv s výkony, objednané termíny na 2 týdny dopředu a nepřítomnost lékaře s rezervacemi k přeobjednání. Všechna data jsou smyšlená.
+
+**Zastavení:** `docker compose down` (data zůstanou), `docker compose down -v` (smaže i databázi; při dalším startu se založí znovu).
 
 # Testy
 
@@ -128,12 +157,36 @@ Aplikace běží na `http://localhost:8080`. Podrobnosti a proměnné prostřed�
 
 Spuštění: `./mvnw verify` (pokrytí pak v `target/site/jacoco/index.html`). Pro E2E viz README. CI v GitHub Actions spouští při každém pushi a pull requestu obojí. Navíc vypíše pokrytí do souhrnu běhu, prohledá historii na hesla (gitleaks), Docker image na opravitelné vysoké a kritické zranitelnosti (Grype) a ověří, že `dokumentace.pdf` není starší než `dokumentace.md`.
 
-> TODO: doplnit počty testů a výsledek posledního běhu CI (screenshot).
+**Počty a výsledek:** 46 jednotkových testů, 29 integračních testů a 8 prohlížečových scénářů, které v CI běží dvakrát (desktop a tablet). Poslední běh CI 27. 10. 2026 na commitu `bb304e6` prošel ve všech jobech: build a testy, kontroly (gitleaks, aktuálnost PDF), sken image a E2E.
+
+\newpage
 
 # Protokol o zacyklení agenta
 
-> TODO (vlastními slovy, 1 strana): konkrétní situace, kdy se agent zasekl nebo dával nefunkční výstup, jak jsem to poznal, co jsem zkusil a jak se to vyřešilo. Podklady sbírám průběžně (viz CLAUDE.md).
+**Situace.** 27. 10. 2026 vzniklo s agentem (Claude Code) během jednoho dne přes dvacet commitů: rezervace, návštěvy, výkaz, přihlášení, GDPR, webové rozhraní, E2E testy a rozšíření CI. Každý krok agent uzavřel jako hotový. Commity ale zůstaly jen lokálně, na GitHub odešly až večer najednou spolu s dokumentací.
+
+**První signál.** Po pushi se u pull requestu #2 objevilo „5 failing and 4 successful checks“. Selhal build s testy, kontrola hesel (gitleaks) i sken zranitelností Docker image. Do té doby nic nenaznačovalo problém, protože poslední zelené CI bylo z 23. 10.
+
+**Co bylo špatně.** Šlo o tři nezávislé chyby, které se do té doby nikde neprojevily:
+
+1. *Integrační testy nikdy neběžely lokálně.* Testcontainers 1.20 ze Spring Bootu 3.4.1 se nedokázal připojit k Dockeru 29 („Could not find a valid Docker environment“), takže všech 29 integračních testů lokálně končilo chybou. CI, kde by se to ukázalo, se nespouštělo, protože commity nebyly pushnuté. Tři testy byly přitom opravdu rozbité: hledání podle části telefonu s předvolbou `+420` vracelo prázdný výsledek (skutečná chyba v aplikaci), test přihlášení neposílal hlavičku `Accept: text/html` jako prohlížeč a test diáře počítal s tím, že v daném dni nejsou rezervace z jiných testů.
+2. *Zastaralé závislosti.* Spring Boot 3.4.1 z prosince 2024 obsahoval Tomcat, Jackson, Spring Security a ovladač PostgreSQL se známými kritickými zranitelnostmi. Sken Grype, který agent sám do CI přidal, je správně zastavil.
+3. *Chybějící oprávnění.* gitleaks u pull requestu potřebuje číst seznam commitů (`pull-requests: read`), workflow mělo jen `contents: read`. Při pushi to fungovalo, chyba se projevila až u prvního PR.
+
+**Jak jsem to rozsekl.** Agentovi jsem místo popisu poslal přímo screenshot a výpisy z CI. Agent si logy stáhl přes `gh run view --log-failed`, rozdělil selhání na tři příčiny a pustil `./mvnw verify` lokálně. Tím se ukázal problém s Dockerem. Povýšení na Spring Boot 3.5.16 (s novějším Testcontainers) vyřešilo současně lokální běh i většinu zranitelností. Zbylé knihovny se přepsaly verzí v `pom.xml` a výsledek se ověřil během Grype v Dockeru ještě před pushem. Povýšení ale odhalilo další chybu: nová Spring Security ověřuje heslo i u zamčeného účtu a náhradní účet mělo heslo bez prefixu `{noop}`. Agent při opravě testu diáře napsal nejdřív kontrolu závislou na časovém pásmu (`09:00Z`), kterou sám před spuštěním nahradil kontrolou podle pacienta. Po pushi prošly oba běhy CI.
+
+**Poučení.** Hlášení agenta „hotovo“ ani lokálně zelené jednotkové testy nejsou důkaz. Za hotové beru jen pushnutý commit se zeleným CI, a pushuji průběžně, ne na konci dne. Když lokálně nejde spustit část testů, je to chyba, kterou je potřeba opravit hned, ne přeskočit.
+
+\newpage
 
 # Přiznání práce s AI
 
-> TODO (vlastními slovy): které části vznikly s pomocí AI (Claude Code), jak jsem výstup kontroloval a upravoval a co jsem psal sám.
+**Nástroje.** Claude Code (agent v terminálu) s modely Claude Sonnet 5.5 (začátek projektu, 23. 10. 2026) a Claude Opus 5.5 (od 27. 10. 2026). Commity, na kterých se agent podílel, mají v popisu řádek `Co-Authored-By: Claude …`; týká se to prakticky všech commitů v repozitáři.
+
+**Na které části.** Agent podle mého zadání napsal kód všech vrstev (controllery, služby, repozitáře, entity), migrace Flyway a syntetická data, webové rozhraní, jednotkové, integrační i prohlížečové testy, Docker a CI konfiguraci, README a tuto dokumentaci včetně ER diagramu. Ode mě pochází volba zadání a technologií, pravidla pro práci agenta (`CLAUDE.md`: vrstvy, žádné SQL v controlleru, nic se nemaže, jen syntetická data) a rozhodnutí k otevřeným bodům zadání (oddíl Rozhodnutí v README), která jsem s agentem procházel a schvaloval.
+
+**Jak byl výsledek ověřen.**
+
+- Automaticky: `./mvnw verify` s jednotkovými a integračními testy proti skutečné PostgreSQL, test ArchUnit hlídající vrstvy, Playwright E2E testy na desktopu i tabletu a CI při každém pushi (včetně hledání hesel a skenu zranitelností). Pravidla jako nepřekrývání termínů drží i databáze, takže chyba v aplikační logice nemůže poškodit data.
+- Ručně: aplikaci jsem proklikal v prohlížeči a s pomocí nahrané prohlídky pro klienta (`e2e/prohlidka/`) prošel všechny funkce. Kód jsem četl po jednotlivých commitech, abych ho uměl vysvětlit a upravit při obhajobě.
+- To, že ověřování nebylo bez chyb, popisuje protokol o zacyklení výše.

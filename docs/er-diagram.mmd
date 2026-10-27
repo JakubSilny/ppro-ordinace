@@ -1,0 +1,92 @@
+%% Zdroj ER diagramu; PNG: viz README, oddíl Dokumentace
+erDiagram
+    insurer ||--o{ patient : "pojišťuje"
+    patient ||--o{ appointment : "má"
+    doctor ||--o{ appointment : "přijímá"
+    doctor ||--o{ office_hours : "ordinuje"
+    doctor ||--o{ doctor_absence : "chybí"
+    appointment |o--o| appointment : "přesunuto z"
+    appointment ||--o| visit : "proběhla jako"
+    visit ||--o{ visit_procedure : "M:N"
+    procedure_item ||--o{ visit_procedure : "M:N"
+
+    insurer {
+        bigint id PK
+        varchar code UK
+        varchar name
+    }
+    patient {
+        bigint id PK
+        varchar first_name
+        varchar last_name
+        int birth_year
+        varchar phone
+        varchar insurance_id UK "nepovinné"
+        bigint insurer_id FK
+        boolean active "vyřazení místo smazání"
+    }
+    doctor {
+        bigint id PK
+        varchar first_name
+        varchar last_name
+        boolean active
+    }
+    office_hours {
+        bigint id PK
+        bigint doctor_id FK
+        smallint weekday
+        time from_time
+        time to_time
+        varchar location
+        boolean bookable
+    }
+    doctor_absence {
+        bigint id PK
+        bigint doctor_id FK
+        timestamptz start_at
+        timestamptz end_at
+        varchar reason
+    }
+    appointment {
+        bigint id PK
+        bigint doctor_id FK
+        bigint patient_id FK
+        timestamptz start_at
+        timestamptz end_at
+        varchar status
+        boolean needs_rebooking
+        bigint rescheduled_from_id FK
+        varchar created_by
+        varchar updated_by
+    }
+    visit {
+        bigint id PK
+        bigint appointment_id FK,UK
+        varchar note
+    }
+    procedure_item {
+        bigint id PK
+        varchar code UK
+        varchar name
+        int points
+        boolean countable
+    }
+    visit_procedure {
+        bigint id PK
+        bigint visit_id FK
+        bigint procedure_id FK
+        int quantity
+        int points_at_time "body v době zápisu"
+        timestamptz voided_at "storno"
+    }
+    audit_log {
+        bigint id PK
+        timestamptz at
+        varchar username
+        varchar method
+        varchar path
+        int status
+    }
+
+    classDef mn fill:#ffe9a8,stroke:#b07d00,stroke-width:3px
+    class visit_procedure mn
