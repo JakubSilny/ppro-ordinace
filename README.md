@@ -53,7 +53,16 @@ Prohlížečové testy (Playwright) běží proti spuštěné aplikaci:
 
 ```bash
 APP_USERS=e2e:e2e-password-123 docker compose up --build -d
-cd e2e && npm ci && npx playwright install chromium && npx playwright test
+cd e2e && npm ci && npx playwright install chromium && npm test
+```
+
+### Prohlídka pro klienta
+
+`e2e/prohlidka/` je samostatný scénář, který v okně prohlížeče pomalu projde všechny funkce s českými popisky: přihlášení, diář, objednání nového pacienta, přesun, zrušení, akutního pacienta se zápisem výkonů, nemoc lékaře a přeobjednání, kartotéku s GDPR, výkaz, přehled rušení a tablet. Nahraje přitom video (`e2e/test-results/**/video.webm`), které lze klientovi poslat.
+
+```bash
+SPRING_PROFILES_ACTIVE=demo APP_USERS=e2e:e2e-password-123 docker compose up --build -d
+cd e2e && npm run prohlidka            # tempo: PAUSE=2500 (ms na popisek), SLOWMO=400 (ms na akci)
 ```
 
 Obojí spouští GitHub Actions při každém pushi (`.github/workflows/ci.yml`). E2E testy běží ve dvou profilech: desktop a tablet.

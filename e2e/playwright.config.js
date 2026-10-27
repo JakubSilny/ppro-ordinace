@@ -18,5 +18,17 @@ module.exports = defineConfig({
   projects: [
     { name: 'desktop', use: { ...devices['Desktop Chrome'] } },
     { name: 'tablet', use: { ...devices['iPad (gen 7) landscape'], browserName: 'chromium' } },
+    // prohlídka pro klienta: npm run prohlidka (není součástí testů v CI)
+    {
+      name: 'prohlidka',
+      testDir: './prohlidka',
+      retries: 0,
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1440, height: 900 },
+        video: { mode: 'on', size: { width: 1440, height: 900 } },
+        launchOptions: { slowMo: Number(process.env.SLOWMO ?? 250) },
+      },
+    },
   ],
 });
