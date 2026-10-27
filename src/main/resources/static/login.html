@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Přihlášení – Ordinace Na Vyhlídce</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/assets/app.css">
+</head>
+<body class="login-page">
+  <main class="login">
+    <div class="login-brand">
+      <img src="/favicon.svg" alt="" width="40" height="40">
+      <div>
+        <h1>Ordinace Na Vyhlídce</h1>
+        <p class="muted">Objednávání a evidence pacientů</p>
+      </div>
+    </div>
+    <p id="login-message" class="notice" role="status" hidden></p>
+    <form method="post" action="/login" class="stack">
+      <input type="hidden" name="_csrf" id="csrf">
+      <label class="field">
+        <span>Uživatelské jméno</span>
+        <input name="username" autocomplete="username" required autofocus>
+      </label>
+      <label class="field">
+        <span>Heslo</span>
+        <input name="password" type="password" autocomplete="current-password" required>
+      </label>
+      <button class="btn primary large" type="submit">Přihlásit se</button>
+    </form>
+    <p class="fineprint">Systém obsahuje zdravotní údaje pacientů. Přístupy se zaznamenávají. Po 30 minutách nečinnosti budete odhlášeni.</p>
+  </main>
+  <script src="/assets/login.js"></script>
+</body>
+</html>

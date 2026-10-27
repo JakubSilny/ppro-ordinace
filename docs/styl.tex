@@ -1,0 +1,56 @@
+% Vzhled PDF dokumentace (barvy podle webového rozhraní, viz app.css)
+\usepackage{xcolor}
+\definecolor{primary}{HTML}{2C6E63}
+\definecolor{primarysoft}{HTML}{E4F1ED}
+\definecolor{ink}{HTML}{1C2B2D}
+\definecolor{muted}{HTML}{56676A}
+
+% nadpisy bez balíčku titlesec (BasicTeX ho nemá)
+\makeatletter
+\renewcommand\section{\@startsection{section}{1}{\z@}{-1.6em}{1em}{\Large\bfseries\color{primary}}}
+\renewcommand\subsection{\@startsection{subsection}{2}{\z@}{-1.2em}{0.6em}{\large\bfseries\color{ink}}}
+\makeatother
+
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\color{muted}Ordinace Na Vyhlídce}
+\fancyhead[R]{\small\color{muted}PPRO, ZS 2026/2027}
+\fancyfoot[C]{\small\color{muted}\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\headrule}{{\color{primarysoft}\hrule height\headrulewidth}}
+
+\usepackage{eso-pic}
+
+\renewcommand{\maketitle}{%
+  \begin{titlepage}
+    \AddToShipoutPictureBG*{\color{primary}\AtPageUpperLeft{\rule[-9.5cm]{\paperwidth}{9.5cm}}}
+    \vspace*{0.4cm}
+    {\color{white}\small POKROČILÉ PROGRAMOVÁNÍ (PPRO) \textbullet{} FIM UHK\par}
+    \vspace{1.6cm}
+    {\color{white}\fontsize{34}{40}\selectfont\bfseries Ordinace Na Vyhlídce\par}
+    \vspace{0.4cm}
+    {\color{white}\Large Objednávací a evidenční systém pro praktické lékaře\par}
+    \vspace{3.2cm}
+    {\color{primary}\large\bfseries Dokumentace semestrálního projektu\par}
+    \vspace{1.2cm}
+    \renewcommand{\arraystretch}{1.6}
+    \begin{tabular}{@{}l@{\hspace{1.2cm}}l@{}}
+      {\color{muted}Zadání} & A -- ordinace praktických lékařů \\
+      {\color{muted}Autor} & Jakub Silný \\
+      {\color{muted}Studijní obor} & Aplikovaná informatika \\
+      {\color{muted}Akademický rok} & 2026/2027, zimní semestr \\
+      {\color{muted}Repozitář} & \url{https://github.com/JakubSilny/ppro-ordinace} \\
+    \end{tabular}
+    \vfill
+    {\small\color{muted}Univerzita Hradec Králové, Fakulta informatiky a managementu\par}
+  \end{titlepage}
+}
+
+% obsah na samostatné straně
+\let\oldtableofcontents\tableofcontents
+\renewcommand{\tableofcontents}{\oldtableofcontents\newpage}
+
+\setlength{\parskip}{0.5em}
+\usepackage{float}
+\floatplacement{figure}{H}

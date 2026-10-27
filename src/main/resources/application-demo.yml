@@ -1,0 +1,6 @@
+# Ukázková data pro předvedení: SPRING_PROFILES_ACTIVE=demo. V ostrém provozu nezapínat.
+spring:
+  flyway:
+    locations: classpath:db/migration,classpath:db/demo
+    # demo data mají verzi V100, novější migrace schématu (V4, V5…) se jinak na demo databázi už nespustí
+    out-of-order: true

@@ -1,55 +1,157 @@
-# Ordinace Na Vyhlídce (PPRO Zadání A)
+# Ordinace Na Vyhlídce
 
-Rezervační a ordinační systém pro praktické lékaře (UHK, ZS 2026/2027).
+Objednávací a evidenční systém pro soukromou praxi praktických lékařů. Recepce v něm vede diář lékařů, objednává pacienty do volných termínů, zapisuje návštěvy a provedené výkony a na konci měsíce stáhne výkaz pro pojišťovnu.
 
-## Spuštění aplikace
+Semestrální projekt PPRO (UHK, ZS 2026/2027), zadání A. Všechna data v systému jsou syntetická.
 
-Pro spuštění aplikace a PostgreSQL databáze stačí jediný příkaz (předem vytvořte `.env` z `.env.example`):
+## Co systém umí
+
+- **Diář lékaře po týdnech.** Ukazuje ordinační hodiny, objednané pacienty, nepřítomnosti a volná okna pro zvolenou délku termínu. Kliknutím na volné okno se pacient rovnou objedná.
+- **Rezervace.** Zrušení (termín se uvolní), „nedostavil se“ a přesun na jiný termín (původní rezervace zůstává v historii) se řeší přímo v diáři.
+- **Akutní pacient.** Objednání na aktuální čas, pokud je lékař v ordinaci.
+- **Pacienti.** Hledání podle příjmení (bez ohledu na diakritiku) nebo telefonu, karta s historií, hlídání duplicit a vyřazení z evidence místo smazání.
+- **Návštěvy a výkony.** Výkony z číselníku, u počitatelných výkonů s počtem. Body se při zápisu zmrazí a chybný zápis se stornuje, nemaže.
+- **Nepřítomnost lékaře.** Dotčené rezervace se označí a objeví se v seznamu **K přeobjednání**.
+- **Rozpis dne** pro lékaře k vytištění: kdo přijde, kdy, s jakým důvodem a s telefonem.
+- **Měsíční výkaz** pro lékaře: souhrn podle výkonu, jednotlivé výkony, součet bodů, export do CSV pro Excel a tisk.
+- **Přehled rušení.** Kdo ruší nebo nechodí ve zvoleném období.
+- **Ochrana osobních údajů.** Přihlášení, záznam přístupů ke kartě pacienta a export všech údajů pacienta (viz níže).
+
+Rozhraní je česky, ovládá se myší, klávesnicí i dotykem a funguje i na tabletu.
+
+## Spuštění
+
+Potřebujete Git a Docker (s Docker Compose). Java ani Maven potřeba nejsou, aplikace se sestaví v Dockeru.
 
 ```bash
-cp .env.example .env
-docker compose up --build -d
+git clone https://github.com/JakubSilny/ppro-ordinace.git
+cd ppro-ordinace
+cp .env.example .env           # pro vyzkoušení stačí beze změny
+docker compose up --build -d   # první sestavení trvá několik minut
 ```
 
-- Aplikace a rozhraní recepce: **[http://localhost:8080](http://localhost:8080)**
-- PostgreSQL databáze: `localhost:5432` (uživatel: `ordinace`, heslo: `ordinace`, db: `ordinace`)
+Aplikace poběží na **http://localhost:8080**. S nezměněným `.env.example` se přihlásíte jménem **`recepce`** a heslem **`zmente-toto-heslo`**. Pro ostrý provoz nastavte v `.env` vlastní heslo databáze (`DB_PASSWORD`) a účty personálu v `APP_USERS` (formát `jmeno:heslo,jmeno2:heslo2`). Bez účtů aplikace odmítne nastartovat. Zastavení: `docker compose down`.
 
-### Spuštění testů
+Databáze PostgreSQL je dostupná jen z tohoto počítače (`127.0.0.1:5432`). Schéma i výchozí data (číselníky, lékaři, 100 syntetických pacientů) založí migrace Flyway při prvním startu.
+
+S profilem `demo` (výchozí v `.env.example`) se navíc založí ukázkový provoz: 30 dalších pacientů, asi 8 týdnů proběhlých návštěv s výkony, zrušené a vynechané termíny (paní Krátká ruší opakovaně), objednaní pacienti na 2 týdny dopředu, dovolená a školení lékaře s rezervacemi k přeobjednání. Časy se počítají od prvního spuštění. Pro ostrý provoz proměnnou `SPRING_PROFILES_ACTIVE` smažte.
+
+| Proměnná | Význam |
+|---|---|
+| `DB_NAME`, `DB_USER`, `DB_PASSWORD` | databáze |
+| `APP_USERS` | účty personálu, `jmeno:heslo` oddělené čárkou; heslo může být bcrypt hash (viz níže) |
+| `COOKIE_SECURE` | `true`, pokud aplikace běží za HTTPS proxy |
+| `SPRING_PROFILES_ACTIVE` | `demo` = ukázková data (jen pro předvedení) |
+
+Aby heslo v `.env` neleželo čitelně, lze místo něj zadat hash: `htpasswd -nbB vera 'tajne-heslo'` vypíše `vera:$2y$05$…`, do `APP_USERS` pak patří `vera:{bcrypt}$$2y$$05$$…`. Každý `$` se v `.env` pro Docker Compose zdvojuje.
+
+Pro provoz mimo jeden počítač patří aplikace za reverzní proxy s HTTPS (např. Caddy nebo nginx) a `COOKIE_SECURE=true`.
+
+## Testy
 
 ```bash
-./mvnw verify
+./mvnw verify                    # jednotkové testy + integrační testy proti PostgreSQL (Testcontainers, potřebuje Docker)
+                                 # pokrytí: target/site/jacoco/index.html; LayersTest hlídá směr závislostí mezi vrstvami
 ```
 
----
+Prohlížečové testy (Playwright) běží proti spuštěné aplikaci:
 
-## Architektura a technologie
+```bash
+APP_USERS=e2e:e2e-password-123 docker compose up --build -d
+cd e2e && npm ci && npx playwright install chromium && npm test
+```
 
-- **Java 21**, **Spring Boot 3.4** (Web, Data JPA, Validation)
-- **Třívrstvá architektura**: Controller (`api`) → Service (`service`) → Repository (`repository`)
-- **PostgreSQL 16** v Dockeru s verzovanými Flyway migracemi (`V1__init_schema.sql`, `V2__seed_data.sql`)
-- **PostgreSQL GiST Exclusion Constraints** (`btree_gist`): ochrana proti překryvům termínů lékaře i pacienta přímo na úrovni DB jádra
-- **Testy**: JUnit 5, AssertJ, Mockito a Testcontainers
+### Prohlídka pro klienta
 
----
+`e2e/prohlidka/` je samostatný scénář, který v okně prohlížeče pomalu projde všechny funkce s českými popisky: přihlášení, diář, objednání nového pacienta, přesun, zrušení, akutního pacienta se zápisem výkonů, nemoc lékaře a přeobjednání, kartotéku s GDPR, výkaz, přehled rušení a tablet. Nahraje přitom video (`e2e/test-results/**/video.webm`), které lze klientovi poslat.
 
-## Oddíl Rozhodnutí (řešení otevřených bodů)
+```bash
+SPRING_PROFILES_ACTIVE=demo APP_USERS=e2e:e2e-password-123 docker compose up --build -d
+cd e2e && npm run prohlidka            # tempo: PAUSE=2500 (ms na popisek), SLOWMO=400 (ms na akci)
+```
 
-- **K1 Délka termínu**: Vlastní délka v násobcích 5 minut (výchozí 15 min), termín musí celý ležet uvnitř jednoho bookable bloku ordinačních hodin; kolize hlídá databázový exclusion constraint u lékaře i pacienta.
-- **K2 Kdo zakládá**: Rezervace zakládá recepce; rezervační logika je plně zapouzdřena v servisní vrstvě nezávisle na prezentačním rozhraní.
-- **K3 Zrušená rezervace**: Zrušení nastaví stav `CANCELLED`, řádek v historii zůstává, ale termín se okamžitě uvolní v kalendáři i volných slotech.
-- **K4 / K4a Identifikátor pojištěnce**: Číslo pojištěnce (`insurance_id`) je nepovinné a unikátní pokud je vyplněno (duplicita vrací 409 Conflict). U pacientů bez čísla (samoplátci, cizinci) se hlídá shoda jména, roku narození a telefonu s možností potvrzení duplicity recepcí.
-- **K5 Nemoc a absence lékaře**: Zadáním absence lékaře dostanou všechny dotčené rezervace ve stavu `BOOKED` příznak `needs_rebooking = true` a objeví se ve výstražném seznamu pro recepci.
-- **P1 Zápis návštěvy**: Návštěvu a výkony lze zapsat až po začátku rezervace (ověřováno přes `Clock`), zápis nastaví stav rezervace na `COMPLETED`.
-- **P2 Vazba návštěvy a rezervace**: Návštěva má pevnou vazbu 1:1 na rezervaci; akutní pacient představuje rezervaci na aktuální čas.
-- **P3 Stavy zrušení**: Rozlišuje se `CANCELLED` (zrušeno předem) a `NO_SHOW` (pacient se nedostavil po začátku termínu).
-- **P5 Přesun termínu**: Přesun probíhá v jedné transakci – původní rezervace přejde do stavu `RESCHEDULED`, nová na ni odkazuje přes `rescheduled_from_id`.
-- **P6 Souběh pacienta**: Pacient nesmí mít překrývající se aktivní rezervace ani u různých lékařů (vynuceno databází i aplikační kontrolou).
-- **P7 Rezervace do minulosti**: Rezervace smí začínat od začátku dnešního dne (`Europe/Prague`), starší termíny jsou blokovány.
-- **P8, P9 Ordinační hodiny**: Týdenní šablona ordinačních hodin s místem a příznakem `bookable`. Úterní výjezdní pobočka Poliklinika Jih je nastavena jako nebookovatelná.
-- **P10 Celistvost termínu**: Celá rezervace musí ležet uvnitř jednoho spojitého ordinačního intervalu.
-- **P11, P12 Absence lékaře**: Do termínu nahlášené absence nelze rezervovat žádný termín.
-- **P13 Pojišťovny**: Číselník 7 oficiálních českých zdravotních pojišťoven.
-- **P14, P15 Vyhledávání pacientů**: Vyhledávání podle začátku příjmení bez ohledu na velikost písmen a bez diakritiky (`unaccent`), telefon vyhledáván po očištění na číslice.
-- **P16 Mazání**: Pacienti ani lékaři se nemažou, pouze deaktivují; deaktivace pacienta s budoucí aktivní rezervací je odmítnuta.
-- **P17, P18, P19 Výkony na návštěvě**: Vazba M:N nese počet (`quantity >= 1`) a zmražené body v době zápisu (`points_at_time`), výkon lze stornovat přes `voided_at`.
-- **N1 Uživatelské rozhraní**: Jednostránková přehledná webová aplikace pro recepci s velkými tlačítky, okamžitým našeptávačem pacientů, výběrem volných slotů a přehledem k přeobjednání.
+GitHub Actions (`.github/workflows/ci.yml`) při každém pushi a pull requestu spouští `./mvnw verify` s reportem pokrytí, E2E testy ve dvou profilech (desktop a tablet), hledání hesel v historii (gitleaks), sken Docker image na známé zranitelnosti (Grype) a kontrolu, že PDF dokumentace není starší než její zdroj. Prohlídka pro klienta v CI neběží.
+
+## Dokumentace
+
+Dokumentace projektu je v `docs/dokumentace.pdf`: datový model s ER diagramem, architektura, technologie, spuštění, testy, protokol o zacyklení agenta a přiznání práce s AI. Zdroj je `docs/dokumentace.md`, vzhled (titulní strana, barvy, záhlaví) určuje `docs/styl.tex`. PDF se vytvoří příkazem (potřeba pandoc a XeLaTeX):
+
+```bash
+cd docs && pandoc dokumentace.md -o dokumentace.pdf --pdf-engine=xelatex
+```
+
+ER diagram `docs/er-diagram.png` se kreslí ze zdroje `docs/er-diagram.mmd` (Mermaid):
+
+```bash
+cd docs && docker run --rm -u $(id -u):$(id -g) -v "$PWD:/data" minlag/mermaid-cli:11.12.0 -i er-diagram.mmd -o er-diagram.png -w 1800 -b white
+```
+
+## Práce s AI
+
+Projekt vznikal s agentem Claude Code (modely Claude Sonnet 5.5 a Claude Opus 5.5). Agent podle mého zadání psal kód, testy, migrace, CI i dokumentaci; commity, na kterých se podílel, mají řádek `Co-Authored-By: Claude …`. Výsledek ověřují jednotkové, integrační a prohlížečové testy, CI při každém pushi a ruční průchod aplikací. Podrobnosti a konkrétní případ, kdy agent dodal nefunkční řešení, jsou v kapitolách 8 a 9 dokumentace.
+
+## Architektura
+
+- **Java 21, Spring Boot 3.5** (Web, Data JPA, Validation, Security), **PostgreSQL 16**, migrace **Flyway**.
+- Balíčky podle funkcí (`patient`, `doctor`, `appointment`, `visit`, `audit`, `gdpr`, `security`), uvnitř vrstvy `api` → `service` → `repository`. Controller nikdy nesahá na databázi.
+- Pravidla, která musí platit vždy, hlídá i databáze. Dvě rezervace se u lékaře ani u pacienta nepřekryjí (exclusion constraint `btree_gist`). Totéž platí pro unikátní číslo pojištěnce a pro jeden aktivní zápis výkonu na návštěvu. Při souběžném objednání tak uspěje jen jeden požadavek, i kdyby aplikační kontrola proběhla u obou zároveň.
+- Webové rozhraní je statická stránka (HTML, CSS, JavaScript bez frameworku) nad REST API. Písmo Atkinson Hyperlegible je hostované spolu s aplikací.
+
+### REST API (výběr)
+
+| Metoda a cesta | Účel |
+|---|---|
+| `GET /api/appointments?doctorId&from&to` | diář lékaře |
+| `GET /api/appointments/free-slots?doctorId&weekOf&minutes` | volná okna v týdnu |
+| `POST /api/appointments` | nová rezervace |
+| `POST /api/appointments/{id}/cancel`, `/no-show`, `/reschedule` | změny rezervace |
+| `POST /api/appointments/{id}/visit` | zápis návštěvy (jen po začátku termínu) |
+| `POST /api/visits/{id}/procedures`, `…/{itemId}/void` | výkon na návštěvě, storno |
+| `GET /api/reports/monthly?doctorId&month`, `/monthly.csv` | měsíční výkaz |
+| `GET /api/appointments/cancellation-stats?from&to` | kdo ruší |
+| `GET /api/patients?query`, `POST /api/patients` | hledání a zakládání pacientů |
+| `GET /api/patients/{id}/export`, `/access-log` | údaje pacienta a záznam přístupů |
+| `POST /api/doctors/{id}/absences` | nepřítomnost lékaře |
+
+Chyby se vrací jako `application/problem+json`: 404 (neexistuje), 409 (kolize, duplicita), 422 (porušené pravidlo, např. mimo ordinační hodiny).
+
+## Ochrana osobních údajů
+
+Systém zpracovává zdravotní údaje (zvláštní kategorie podle čl. 9 GDPR), proto:
+
+- **Přístup jen po přihlášení.** Odhlášení po 30 minutách nečinnosti, cookie `HttpOnly` a `SameSite=Strict`, ochrana proti CSRF.
+- **Záznam přístupů.** Každé volání API s osobními údaji a každý pokus o přihlášení se zapíše do tabulky `audit_log` (kdo, kdy, co). Hledané výrazy se neukládají. Na kartě pacienta je vidět, kdo ji zobrazil. Záznam nejde upravit ani smazat, hlídá to trigger v databázi.
+- **Kdo co změnil.** U rezervace je vidět, kdo ji objednal a kdo ji naposledy změnil (zrušil, přesunul, zapsal návštěvu).
+- **Ochrana přihlášení.** Po 5 špatných heslech se jméno na 5 minut zablokuje, i když existuje jen v hlavě útočníka.
+- **Právo na přístup a přenositelnost (čl. 15 a 20).** Tlačítkem „Stáhnout všechny údaje“ se stáhne JSON se všemi údaji pacienta, rezervacemi a návštěvami.
+- **Výmaz.** Zdravotnickou dokumentaci je nutné uchovávat po zákonem stanovenou dobu (vyhláška č. 98/2012 Sb.), proto se pacient nemaže, jen vyřadí z evidence.
+- **Minimalizace.** Evidují se jen údaje nutné pro objednání a vykázání péče (bez rodného čísla a adresy).
+- **Technická opatření.** Content-Security-Policy bez inline skriptů, databáze dostupná jen lokálně, kontejner běží pod neprivilegovaným uživatelem s jen pro čtení souborovým systémem a bez linuxových oprávnění, hesla jen v proměnných prostředí (případně jako bcrypt hash). Žádné externí zdroje, takže prohlížeč nekomunikuje s nikým dalším.
+
+## Rozhodnutí
+
+- **K1 Délka termínu.** Rezervace má vlastní délku v násobcích 5 minut (výchozí 15 min) a musí celá ležet v jednom intervalu ordinačních hodin, kde se objednává. Pevná mřížka by nepasovala na prohlídky, které trvají déle.
+- **K2 Kdo zakládá rezervaci.** Jen recepce, po přihlášení. Pravidla jsou v servisní vrstvě nezávisle na rozhraní, takže se dá později doplnit online objednávání bez jejich přepisu.
+- **K3 Zrušená rezervace.** Zrušení nastaví stav `CANCELLED` a rezervace zmizí z diáře, ale v databázi zůstane. Ze zrušených se počítá přehled rušení.
+- **K4/K4a Totožnost pacienta.** Číslo pojištěnce je nepovinné, ale unikátní, takže duplicita vrátí 409 s odkazem na existující kartu. Bez čísla (cizinec, samoplátce) se hlídá shoda jména, roku narození a telefonu a recepce může vědomě založit jiného člověka se stejnými údaji.
+- **K5 Nemoc lékaře.** Zadaná nepřítomnost blokuje objednávání a dotčené rezervace dostanou příznak „k přeobjednání“. Volání pacientům zůstává na recepci, systém nic hromadně neruší ani nepřesouvá.
+- **P1 Zápis návštěvy.** Návštěvu lze zapsat až po začátku termínu a rezervace tím přejde do stavu `COMPLETED`.
+- **P2 Návštěva bez rezervace.** Návštěva je vždy vázaná na rezervaci. Akutní pacient dostane rezervaci na aktuální čas (tlačítko „Akutní pacient“).
+- **P3 Druhy zrušení.** `CANCELLED` (pacient se omluvil) a `NO_SHOW` (nepřišel, lze až po začátku termínu) se evidují zvlášť.
+- **P4 Kdo ruší opakovaně.** Bez pevného prahu: přehled za zvolené období řazený podle počtu.
+- **P5 Přesun.** V jedné transakci se původní rezervace přepne na `RESCHEDULED` a nová na ni odkazuje (`rescheduled_from_id`).
+- **P6 Souběh u pacienta.** Pacient nemůže mít dvě překrývající se rezervace ani u různých lékařů (aplikace i DB).
+- **P7 Minulost.** Objednat lze od začátku dnešního dne (Europe/Prague), dřív ne.
+- **P8/P9 Ordinační hodiny.** Týdenní šablona s místem a příznakem, zda se tam objednává. Úterní pobočka je vidět v diáři, ale objednat do ní nejde.
+- **P10 Celistvost.** Rezervace nesmí přesahovat přes polední pauzu ani konec ordinační doby.
+- **P11/P12 Absence.** Nepřítomnost je časový interval. Příznak k přeobjednání dostanou jen objednané (`BOOKED`) rezervace a zůstává jim i po případném odstranění absence, dokud je recepce nevyřeší.
+- **P13 Pojišťovny.** Pevný číselník sedmi českých zdravotních pojišťoven.
+- **P14/P15 Hledání.** Podle začátku příjmení bez diakritiky a velikosti písmen, nebo podle části telefonu. Telefon se ukládá jen jako číslice bez předvolby +420.
+- **P16 Mazání.** Pacienti ani lékaři se nemažou, jen vyřadí. Vyřadit nejde, dokud mají budoucí rezervace.
+- **P17–P19 Výkony.** Vazba návštěva–výkon (M:N) nese počet a body platné v době zápisu, takže změna ceníku neovlivní minulé výkazy. Jeden výkon je na návštěvě jednou, opakování se zapisuje počtem.
+- **P20 Oprava výkonu.** Stornem (`voided_at`), řádek zůstává.
+- **P21 Historie změn.** Rezervace a pacienti mají `created_at`/`updated_at` a stavy, rezervace navíc autora a posledního, kdo ji změnil. Úplnou historii verzí nevedeme. Kvůli GDPR se zaznamenává každý přístup k osobním údajům (`audit_log`, jen pro zápis).
+- **P22 Výkaz.** Jen z dokončených návštěv a nestornovaných výkonů. Souhrn podle kódu, jednotlivé řádky s číslem pojištěnce a export do CSV.
+- **P23 Volné termíny.** Pro lékaře, týden a délku termínu se počítají souvislá volná okna (ordinační hodiny minus rezervace, nepřítomnosti a uplynulý čas).
+- **N1 Rozhraní.** Jedna stránka pro recepci s velkými ovládacími prvky a písmem pro snadné čtení, rychlým hledáním pacienta v horní liště a podporou tabletu.
+- **T2 Přihlášení.** Původně bez přihlášení, kvůli zdravotním údajům doplněno přihlášení personálu (účty z proměnné prostředí) a záznam přístupů. Role nerozlišujeme, protože recepce i lékaři potřebují stejné funkce.
