@@ -44,9 +44,19 @@ test('Prohlídka aplikace Ordinace Na Vyhlídce', async ({ page }) => {
     year: '1978',
     phone: `7${String(Date.now()).slice(-8)}`,
   };
-  const ourAppt = () => page.locator('button.block.appt', { hasText: `${patient.last} ${patient.first}` }).first();
-  const pickDoctor = (name) => page.locator('#doctor-picker').getByRole('button', { name }).click();
-  const nextWeek = () => page.getByRole('button', { name: 'Další týden' }).click();
+  // rezervace hledáme podle ID z odpovědi serveru – v diáři může být stejné jméno z dřívější prohlídky
+  let apptId;
+  const ourAppt = () => page.locator(`button.block.appt[data-id="${apptId}"]`);
+  const remember = (pattern, method = 'POST') => page.waitForResponse((r) => pattern.test(new URL(r.url()).pathname)
+      && r.request().method() === method).then(async (r) => {
+    if (r.status() < 300) apptId = (await r.json()).id;
+    return r.status();
+  });
+  // po přepnutí týdne nebo lékaře počkat na nové načtení diáře, jinak by klik trefil starý týden
+  const settled = () => expect(page.locator('#diary')).toHaveAttribute('aria-busy', 'false');
+  const pickDoctor = async (name) => { await page.locator('#doctor-picker').getByRole('button', { name }).click(); await settled(); };
+  const week = async (name) => { await page.getByRole('button', { name }).click(); await settled(); };
+  const nextWeek = () => week('Další týden');
   const searchPatient = async (q) => {
     await dialog.getByLabel('Najít pacienta').pressSequentially(q, { delay: 90 });
     await dialog.locator('.list-item').first().click();
@@ -64,6 +74,7 @@ test('Prohlídka aplikace Ordinace Na Vyhlídce', async ({ page }) => {
     await page.getByLabel('Heslo').pressSequentially(PASSWORD, { delay: 40 });
     await page.getByRole('button', { name: 'Přihlásit se' }).click();
     await expect(page.locator('#diary .day').first()).toBeVisible();
+    await settled();
   });
 
   await test.step('Diář lékařů', async () => {
@@ -75,8 +86,9 @@ test('Prohlídka aplikace Ordinace Na Vyhlídce', async ({ page }) => {
     await caption(page, 'Úterní odpoledne na pobočce je vidět, ale objednat se tam nedá (šrafované).');
     await nextWeek();
     await caption(page, 'Listování po týdnech.');
-    await page.getByRole('button', { name: 'Tento týden' }).click();
+    await week('Tento týden');
     await page.locator('#duration').selectOption('30');
+    await settled();
     await caption(page, 'Volná okna se přepočítají podle délky termínu, tady 30 minut.');
     await page.locator('#duration').selectOption('15');
   });
@@ -100,7 +112,9 @@ test('Prohlídka aplikace Ordinace Na Vyhlídce', async ({ page }) => {
     const options = await start.locator('option').count();
     await start.selectOption({ index: Math.min(2, options - 1) });
     await dialog.getByLabel('Důvod návštěvy').pressSequentially('Kontrola tlaku', { delay: 50 });
+    const created = remember(/^\/api\/appointments$/);
     await dialog.getByRole('button', { name: 'Objednat' }).click();
+    expect(await created).toBe(201);
     await expect(lastToast).toContainText('Objednáno');
     await caption(page, 'Hotovo – termín je v diáři. Dva pacienti na stejný čas nejdou ani omylem.');
   });
@@ -113,7 +127,9 @@ test('Prohlídka aplikace Ordinace Na Vyhlídce', async ({ page }) => {
     await caption(page, 'Pacient chce jiný den. Diář je v režimu výběru nového termínu.');
     await nextWeek();
     await page.locator('button.block.free').first().click();
+    const moved = remember(/\/reschedule$/);
     await dialog.getByRole('button', { name: 'Přesunout termín' }).click();
+    expect(await moved).toBe(201);
     await expect(lastToast).toContainText('Termín přesunut');
     await caption(page, 'Přesunuto. Původní rezervace zůstává v historii.');
   });
@@ -128,16 +144,16 @@ test('Prohlídka aplikace Ordinace Na Vyhlídce', async ({ page }) => {
   });
 
   await test.step('Akutní pacient a zápis návštěvy', async () => {
-    await page.getByRole('button', { name: 'Tento týden' }).click();
+    await week('Tento týden');
     await caption(page, 'Akutní pacient: objednání na teď, když je lékař v ordinaci.');
     let booked = false;
     for (const d of DOCTORS) {
       await pickDoctor(d);
       await page.locator('#acute-btn').click();
-      await searchPatient(patient.last);
-      const response = page.waitForResponse((r) => r.url().endsWith('/api/appointments') && r.request().method() === 'POST');
+      await searchPatient(patient.phone);
+      const response = remember(/^\/api\/appointments$/);
       await dialog.getByRole('button', { name: 'Objednat' }).click();
-      if ((await response).status() === 201) { booked = true; break; }
+      if ((await response) === 201) { booked = true; break; }
       await caption(page, `${d} teď neordinuje – systém mimo ordinační hodiny objednat nedovolí.`);
       await page.keyboard.press('Escape');
     }
@@ -147,7 +163,7 @@ test('Prohlídka aplikace Ordinace Na Vyhlídce', async ({ page }) => {
       await dialog.getByRole('button', { name: 'Zapsat návštěvu' }).click();
     } else {
       await caption(page, 'Teď nikdo neordinuje, ukážu tedy návštěvu z minulého týdne.');
-      await page.getByRole('button', { name: 'Předchozí týden' }).click();
+      await week('Předchozí týden');
       const done = page.locator('button.block.appt.COMPLETED').first();
       if (!(await done.count())) return;
       await done.click();
@@ -197,6 +213,7 @@ test('Prohlídka aplikace Ordinace Na Vyhlídce', async ({ page }) => {
     const rebook = page.getByRole('button', { name: 'Nový termín' }).first();
     if (await rebook.count()) {
       await rebook.click();
+      await settled();
       await caption(page, 'Domluvím nový termín a vyberu ho rovnou v diáři.');
       for (let i = 0; i < 3; i++) await nextWeek();
       await page.locator('button.block.free').first().click();

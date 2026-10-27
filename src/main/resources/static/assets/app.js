@@ -366,6 +366,7 @@
         col.append(positioned(h('button', {
           type: 'button',
           class: `block appt ${a.status} ${rebook ? 'rebook' : ''}`,
+          'data-id': a.id,
           'aria-label': `${range(s, e)} ${a.patientName}, ${rebook ? 'k přeobjednání' : STATUS[a.status]}`,
           onclick: () => openAppointment(a),
         }, h('span', { class: 'name' }, h('span', { class: 'time', text: `${fmtTime.format(s)} ` }), a.patientName),

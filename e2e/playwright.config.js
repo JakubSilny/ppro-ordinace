@@ -28,6 +28,8 @@ module.exports = defineConfig({
         viewport: { width: 1440, height: 900 },
         video: { mode: 'on', size: { width: 1440, height: 900 } },
         launchOptions: { slowMo: Number(process.env.SLOWMO ?? 250) },
+        // když chybí tlačítko, spadnout hned s jasnou chybou, ne čekat do konce limitu testu
+        actionTimeout: 15_000,
       },
     },
   ],
