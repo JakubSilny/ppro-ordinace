@@ -1,18 +1,39 @@
+# Jeden pull request za ekosystém místo jednoho za každou knihovnu.
+# Nové hlavní verze knihoven a Docker image (Spring Boot 4, Java mimo 21 LTS) se neberou,
+# ty se přechází ručně; GitHub Actions se aktualizují i o hlavní verze.
 version: 2
 updates:
   - package-ecosystem: maven
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      maven:
+        patterns: ["*"]
   - package-ecosystem: npm
     directory: /e2e
     schedule:
       interval: monthly
+    groups:
+      e2e:
+        patterns: ["*"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
   - package-ecosystem: docker
     directory: /
     schedule:
       interval: monthly
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      docker:
+        patterns: ["*"]
