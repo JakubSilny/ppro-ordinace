@@ -1,12 +1,14 @@
-# Jeden pull request za ekosystém místo jednoho za každou knihovnu.
-# Nové hlavní verze knihoven a Docker image (Spring Boot 4, Java mimo 21 LTS) se neberou,
-# ty se přechází ručně; GitHub Actions se aktualizují i o hlavní verze.
+# Jeden pull request měsíčně za ekosystém místo jednoho za každou knihovnu.
+# Nové hlavní verze knihoven (např. Spring Boot 4) se neberou, ty se přechází ručně;
+# GitHub Actions se aktualizují i o hlavní verze.
+# Docker image tu nejsou: tagy 21-jre a 3.9-eclipse-temurin-21 jsou plovoucí, takže každý build
+# stáhne opravenou Javu 21, a zranitelnosti v image hlídá Grype v CI.
 version: 2
 updates:
   - package-ecosystem: maven
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
@@ -26,14 +28,4 @@ updates:
       interval: monthly
     groups:
       actions:
-        patterns: ["*"]
-  - package-ecosystem: docker
-    directory: /
-    schedule:
-      interval: monthly
-    ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-major"]
-    groups:
-      docker:
         patterns: ["*"]
