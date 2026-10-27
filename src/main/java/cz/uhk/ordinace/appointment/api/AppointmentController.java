@@ -2,6 +2,7 @@ package cz.uhk.ordinace.appointment.api;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -14,10 +15,15 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import cz.uhk.ordinace.appointment.domain.Appointment;
 import cz.uhk.ordinace.appointment.dto.AppointmentResponse;
 import cz.uhk.ordinace.appointment.dto.CreateAppointmentRequest;
 import cz.uhk.ordinace.appointment.dto.RescheduleRequest;
+import cz.uhk.ordinace.appointment.repository.CancellationStat;
 import cz.uhk.ordinace.appointment.service.AppointmentService;
+import cz.uhk.ordinace.appointment.service.TimeRange;
+import cz.uhk.ordinace.patient.domain.Patient;
+import cz.uhk.ordinace.patient.service.PatientService;
 import jakarta.validation.Valid;
 
 @RestController
@@ -25,47 +31,77 @@ import jakarta.validation.Valid;
 public class AppointmentController {
 
     private final AppointmentService appointments;
+    private final PatientService patients;
 
-    public AppointmentController(AppointmentService appointments) {
+    public AppointmentController(AppointmentService appointments, PatientService patients) {
         this.appointments = appointments;
+        this.patients = patients;
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     AppointmentResponse create(@Valid @RequestBody CreateAppointmentRequest request) {
-        return AppointmentResponse.from(appointments.create(request));
+        return response(appointments.create(request));
     }
 
     @GetMapping("/{id}")
     AppointmentResponse get(@PathVariable long id) {
-        return AppointmentResponse.from(appointments.get(id));
+        return response(appointments.get(id));
     }
 
     @GetMapping
     List<AppointmentResponse> diary(@RequestParam long doctorId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return appointments.diary(doctorId, from, to).stream().map(AppointmentResponse::from).toList();
+        return responses(appointments.diary(doctorId, from, to));
+    }
+
+    @GetMapping("/free-slots")
+    List<TimeRange> freeSlots(@RequestParam long doctorId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekOf,
+            @RequestParam(defaultValue = "15") int minutes) {
+        return appointments.freeSlots(doctorId, weekOf, minutes);
+    }
+
+    @GetMapping("/by-patient/{patientId}")
+    List<AppointmentResponse> patientHistory(@PathVariable long patientId) {
+        return responses(appointments.patientHistory(patientId));
     }
 
     @GetMapping("/needs-rebooking")
     List<AppointmentResponse> needsRebooking() {
-        return appointments.needingRebooking().stream().map(AppointmentResponse::from).toList();
+        return responses(appointments.needingRebooking());
+    }
+
+    @GetMapping("/cancellation-stats")
+    List<CancellationStat> cancellationStats(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return appointments.cancellationStats(from, to);
     }
 
     @PostMapping("/{id}/cancel")
     AppointmentResponse cancel(@PathVariable long id) {
-        return AppointmentResponse.from(appointments.cancel(id));
+        return response(appointments.cancel(id));
     }
 
     @PostMapping("/{id}/no-show")
     AppointmentResponse noShow(@PathVariable long id) {
-        return AppointmentResponse.from(appointments.markNoShow(id));
+        return response(appointments.markNoShow(id));
     }
 
     @PostMapping("/{id}/reschedule")
     @ResponseStatus(HttpStatus.CREATED)
     AppointmentResponse reschedule(@PathVariable long id, @Valid @RequestBody RescheduleRequest request) {
-        return AppointmentResponse.from(appointments.reschedule(id, request));
+        return response(appointments.reschedule(id, request));
+    }
+
+    private AppointmentResponse response(Appointment a) {
+        return AppointmentResponse.from(a, patients.get(a.getPatientId()));
+    }
+
+    private List<AppointmentResponse> responses(List<Appointment> list) {
+        Map<Long, Patient> byId = patients.getAll(list.stream().map(Appointment::getPatientId).toList());
+        return list.stream().map(a -> AppointmentResponse.from(a, byId.get(a.getPatientId()))).toList();
     }
 }

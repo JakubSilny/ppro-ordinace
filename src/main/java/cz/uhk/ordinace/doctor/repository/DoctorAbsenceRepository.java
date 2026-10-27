@@ -14,6 +14,11 @@ public interface DoctorAbsenceRepository extends JpaRepository<DoctorAbsence, Lo
 
     List<DoctorAbsence> findByDoctorIdAndEndAtAfterOrderByStartAt(long doctorId, Instant after);
 
+    boolean existsByDoctorIdAndStartAtLessThanAndEndAtGreaterThan(long doctorId, Instant end, Instant start);
+
+    List<DoctorAbsence> findByDoctorIdAndStartAtLessThanAndEndAtGreaterThanOrderByStartAt(long doctorId, Instant end,
+            Instant start);
+
     /** Označí aktivní (BOOKED) rezervace v době absence k přeobjednání; vrací jejich počet. */
     @Modifying
     @Query(value = """

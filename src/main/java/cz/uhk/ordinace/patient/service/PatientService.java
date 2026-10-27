@@ -2,8 +2,12 @@ package cz.uhk.ordinace.patient.service;
 
 import java.time.Clock;
 import java.time.Year;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -64,6 +68,11 @@ public class PatientService {
     @Transactional(readOnly = true)
     public Patient get(long id) {
         return patients.findById(id).orElseThrow(() -> new NotFoundException("Patient " + id + " not found"));
+    }
+
+    @Transactional(readOnly = true)
+    public Map<Long, Patient> getAll(Collection<Long> ids) {
+        return patients.findAllById(ids).stream().collect(Collectors.toMap(Patient::getId, Function.identity()));
     }
 
     /** Čísla a mezery = telefon, jinak začátek příjmení (bez diakritiky a velikosti písmen). */

@@ -68,6 +68,16 @@ public class Appointment {
         status = AppointmentStatus.NO_SHOW;
     }
 
+    /** Návštěvu lze zapsat až po začátku rezervace. */
+    public void complete(Instant now) {
+        requireBooked("completed");
+        if (now.isBefore(startAt)) {
+            throw new BusinessRuleException("Visit cannot be recorded before the appointment starts");
+        }
+        status = AppointmentStatus.COMPLETED;
+        needsRebooking = false;
+    }
+
     public void markRescheduled() {
         requireBooked("rescheduled");
         status = AppointmentStatus.RESCHEDULED;

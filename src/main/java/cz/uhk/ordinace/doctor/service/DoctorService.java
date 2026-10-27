@@ -115,6 +115,16 @@ public class DoctorService {
     }
 
     @Transactional(readOnly = true)
+    public boolean hasAbsence(long doctorId, Instant start, Instant end) {
+        return absences.existsByDoctorIdAndStartAtLessThanAndEndAtGreaterThan(doctorId, end, start);
+    }
+
+    @Transactional(readOnly = true)
+    public List<DoctorAbsence> absencesBetween(long doctorId, Instant start, Instant end) {
+        return absences.findByDoctorIdAndStartAtLessThanAndEndAtGreaterThanOrderByStartAt(doctorId, end, start);
+    }
+
+    @Transactional(readOnly = true)
     public List<DoctorAbsence> upcomingAbsences(long doctorId) {
         get(doctorId);
         return absences.findByDoctorIdAndEndAtAfterOrderByStartAt(doctorId, Instant.now(clock));

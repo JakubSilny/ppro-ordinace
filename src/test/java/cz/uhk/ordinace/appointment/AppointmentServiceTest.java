@@ -183,6 +183,33 @@ class AppointmentServiceTest {
         assertThat(moved.getEndAt()).isEqualTo(at("2026-10-12", "09:15"));
     }
 
+    @Test
+    void freeSlotsLeaveOutBookedTimeAndNonBookableHours() {
+        Appointment existing = booked(14, "2026-10-05", "08:00");
+        when(appointments.findDiary(any(Long.class), any(), any(), any())).thenReturn(List.of(existing));
+
+        assertThat(service.freeSlots(1L, LocalDate.parse("2026-10-07"), 15)).containsExactly(
+                new TimeRange(at("2026-10-05", "08:15"), at("2026-10-05", "12:00")),
+                new TimeRange(at("2026-10-05", "13:00"), at("2026-10-05", "16:00")));
+    }
+
+    @Test
+    void freeSlotsDoNotOfferThePast() {
+        // týden "dneška" (čtvrtek 1. 10.): pondělí 28. 9. už proběhlo
+        assertThat(service.freeSlots(1L, LocalDate.parse("2026-10-01"), 15)).isEmpty();
+    }
+
+    @Test
+    void visitCanBeRecordedOnlyAfterStart() {
+        Appointment future = booked(15, "2026-10-05", "08:00");
+        Appointment started = booked(16, "2026-10-01", "11:45");
+        when(appointments.findById(15L)).thenReturn(Optional.of(future));
+        when(appointments.findById(16L)).thenReturn(Optional.of(started));
+
+        assertThatThrownBy(() -> service.complete(15)).isInstanceOf(BusinessRuleException.class);
+        assertThat(service.complete(16).getStatus()).isEqualTo(AppointmentStatus.COMPLETED);
+    }
+
     private Appointment booked(long id, String date, String time) {
         Instant start = at(date, time);
         Appointment a = new Appointment(1, 2, start, start.plusSeconds(900), Optional.empty(), Optional.empty());
