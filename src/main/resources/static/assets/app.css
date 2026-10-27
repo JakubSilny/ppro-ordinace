@@ -116,6 +116,7 @@ input[aria-invalid="true"] { border-color: var(--danger); }
 .inline-field { display: flex; align-items: center; gap: 0.5rem; }
 .inline-field > span { font-weight: 700; }
 .inline-field select { width: auto; }
+#doctor-picker select { width: auto; min-width: 16rem; font-weight: 700; }
 .stack { display: grid; gap: 1rem; }
 .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; }
 .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; }

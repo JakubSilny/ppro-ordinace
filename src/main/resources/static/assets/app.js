@@ -229,13 +229,26 @@
 
   // ---------- Diář ----------
 
+  // víc tlačítek se na tablet vedle sebe nevejde, pak je místo nich rozbalovací seznam
+  const MAX_DOCTOR_BUTTONS = 4;
+
   function renderDoctorPicker() {
     const picker = $('#doctor-picker');
+    const choose = (id) => { state.doctorId = id; saveDoctor(); renderDoctorPicker(); loadDiary(); };
+    const many = state.doctors.length > MAX_DOCTOR_BUTTONS;
+    picker.classList.toggle('segmented', !many);
+    if (many) {
+      const select = h('select', { 'aria-label': 'Lékař', onchange: (ev) => choose(Number(ev.target.value)) },
+        state.doctors.map((d) => h('option', { value: d.id, text: `MUDr. ${d.lastName} ${d.firstName}` })));
+      select.value = String(state.doctorId);
+      picker.replaceChildren(select);
+      return;
+    }
     picker.replaceChildren(...state.doctors.map((d) => h('button', {
       type: 'button',
       'aria-pressed': String(d.id === state.doctorId),
       text: `MUDr. ${d.lastName}`,
-      onclick: () => { state.doctorId = d.id; saveDoctor(); renderDoctorPicker(); loadDiary(); },
+      onclick: () => choose(d.id),
     })));
   }
 
