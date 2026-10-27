@@ -79,7 +79,7 @@ public class SecurityConfig {
         }
         // zamčené jméno dostane zamčený účet, ať existuje, nebo ne; heslo se pak vůbec neověřuje
         return username -> attempts.isLocked(username)
-                ? User.withUsername(username).password(UUID.randomUUID().toString()).accountLocked(true).build()
+                ? User.withUsername(username).password("{noop}" + UUID.randomUUID()).accountLocked(true).build()
                 : manager.loadUserByUsername(username);
     }
 

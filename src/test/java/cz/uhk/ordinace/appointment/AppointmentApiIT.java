@@ -1,6 +1,5 @@
 package cz.uhk.ordinace.appointment;
 
-import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -97,8 +96,8 @@ class AppointmentApiIT extends AbstractDbIT {
 
         mvc.perform(get("/api/appointments").param("doctorId", String.valueOf(doctor))
                 .param("from", MONDAY.toString()).param("to", MONDAY.toString()))
-                .andExpect(jsonPath("$", hasSize(1)))
-                .andExpect(jsonPath("$[0].patientId").value(patient(26)));
+                .andExpect(jsonPath("$[?(@.id == %d)]", first).isEmpty())
+                .andExpect(jsonPath("$[?(@.patientId == %d)].status", patient(26)).value("BOOKED"));
     }
 
     @Test

@@ -44,6 +44,9 @@ jobs:
   checks:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read # gitleaks u pull requestu čte seznam jeho commitů
     steps:
       - uses: actions/checkout@v4
         with:

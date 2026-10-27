@@ -15,6 +15,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -38,7 +39,7 @@ class SecurityIT extends AbstractDbIT {
     @Test
     void apiRequiresLogin() throws Exception {
         anonymous.perform(get("/api/doctors")).andExpect(status().isUnauthorized());
-        anonymous.perform(get("/")).andExpect(status().is3xxRedirection());
+        anonymous.perform(get("/").accept(MediaType.TEXT_HTML)).andExpect(status().is3xxRedirection());
         anonymous.perform(get("/login.html")).andExpect(status().isOk())
                 .andExpect(header().exists("Content-Security-Policy"));
     }
