@@ -205,6 +205,7 @@
   function route() {
     const [view, param] = location.hash.replace('#', '').split('/');
     const current = VIEWS.includes(view) ? view : 'diar';
+    closeDialog();
     for (const v of VIEWS) $(`#view-${v}`).hidden = v !== current;
     document.querySelectorAll('.tabs a').forEach((a) => {
       if (a.dataset.view === current) a.setAttribute('aria-current', 'page');
@@ -593,14 +594,9 @@
   // ---------- Návštěva a výkony ----------
 
   async function openVisit(appt) {
-    let visit = await run(async () => {
-      try {
-        return await api(`/api/appointments/${appt.id}/visit`);
-      } catch (e) {
-        if (e.status !== 404) throw e;
-        return api(`/api/appointments/${appt.id}/visit`, { method: 'POST', body: {} });
-      }
-    });
+    const visit = await run(() => (appt.status === 'COMPLETED'
+      ? api(`/api/appointments/${appt.id}/visit`)
+      : api(`/api/appointments/${appt.id}/visit`, { method: 'POST', body: {} })));
     if (!visit) return;
     if (!state.procedures) state.procedures = await run(() => api('/api/procedures'));
     if (!state.procedures) return;
