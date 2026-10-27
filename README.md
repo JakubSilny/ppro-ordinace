@@ -55,6 +55,14 @@ cd e2e && npm ci && npx playwright install chromium && npx playwright test
 
 Obojí spouští GitHub Actions při každém pushi (`.github/workflows/ci.yml`). E2E testy běží ve dvou profilech: desktop a tablet.
 
+## Dokumentace
+
+Technická dokumentace je v `docs/dokumentace.pdf`. Její zdroj `docs/dokumentace.md` se převede příkazem:
+
+```bash
+cd docs && pandoc dokumentace.md -o dokumentace.pdf --pdf-engine=xelatex -V mainfont="Helvetica Neue" -V monofont=Menlo -V geometry:margin=2.5cm --toc
+```
+
 ## Architektura
 
 - **Java 21, Spring Boot 3.4** (Web, Data JPA, Validation, Security), **PostgreSQL 16**, migrace **Flyway**.
