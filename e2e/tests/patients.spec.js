@@ -24,7 +24,7 @@ test('nový pacient, nalezení podle telefonu a hlídání duplicity', async ({ 
   await dialog.getByRole('button', { name: 'Založit pacienta' }).click();
   await expect(dialog.getByText(/už v evidenci je/)).toBeVisible();
   await expect(dialog.getByRole('button', { name: 'Otevřít existujícího' })).toBeVisible();
-  await dialog.getByRole('button', { name: 'Zavřít' }).click();
+  await page.keyboard.press('Escape');
 
   await page.getByLabel('Najít pacienta').fill(phone.slice(0, 6));
   await expect(page.locator('#global-results').getByText(`${lastName} Alena`)).toBeVisible();

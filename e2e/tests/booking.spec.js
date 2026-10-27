@@ -1,13 +1,19 @@
 const { test, expect } = require('@playwright/test');
 const { login } = require('./helpers');
 
+// po přepnutí lékaře nebo týdne počkat na nové načtení diáře, jinak by klik trefil starý týden
+async function click(page, name) {
+  await page.getByRole('button', { name }).click();
+  await expect(page.locator('#diary')).toHaveAttribute('aria-busy', 'false');
+}
+
 test('objednání z volného okna, zrušení a uvolnění termínu', async ({ page }, testInfo) => {
   await login(page);
   // každý projekt používá jiného lékaře, aby si testy nesahaly na stejné termíny
   const doctor = testInfo.project.name === 'tablet' ? 'MUDr. Marešová' : 'MUDr. Vyhlídalová';
-  await page.getByRole('button', { name: doctor }).click();
-  await page.getByRole('button', { name: 'Další týden' }).click();
-  await page.getByRole('button', { name: 'Další týden' }).click();
+  await click(page, doctor);
+  await click(page, 'Další týden');
+  await click(page, 'Další týden');
 
   const free = page.locator('button.block.free').first();
   await expect(free).toBeVisible();
@@ -18,10 +24,13 @@ test('objednání z volného okna, zrušení a uvolnění termínu', async ({ pa
   await dialog.getByLabel('Najít pacienta').fill('Kuč');
   await dialog.locator('.list-item').first().click();
   await dialog.getByLabel('Důvod návštěvy').fill('Preventivní prohlídka');
+  // podle ID z odpovědi: v diáři může být Kučerová z dřívějšího běhu proti stejné databázi
+  const created = page.waitForResponse((r) => new URL(r.url()).pathname === '/api/appointments'
+    && r.request().method() === 'POST');
   await dialog.getByRole('button', { name: 'Objednat' }).click();
   await expect(page.getByText(/^Objednáno: /)).toBeVisible();
 
-  const booked = page.locator('button.block.appt', { hasText: 'Kučerová' }).first();
+  const booked = page.locator(`button.block.appt[data-id="${(await (await created).json()).id}"]`);
   await expect(booked).toBeVisible();
   await booked.click();
   await expect(dialog.getByText('Preventivní prohlídka')).toBeVisible();
@@ -34,8 +43,8 @@ test('objednání z volného okna, zrušení a uvolnění termínu', async ({ pa
 test('přesun termínu přes režim výběru', async ({ page }, testInfo) => {
   await login(page);
   const doctor = testInfo.project.name === 'tablet' ? 'MUDr. Marešová' : 'MUDr. Vyhlídalová';
-  await page.getByRole('button', { name: doctor }).click();
-  for (let i = 0; i < 3; i++) await page.getByRole('button', { name: 'Další týden' }).click();
+  await click(page, doctor);
+  for (let i = 0; i < 3; i++) await click(page, 'Další týden');
 
   await page.locator('button.block.free').first().click();
   const dialog = page.getByRole('dialog');
