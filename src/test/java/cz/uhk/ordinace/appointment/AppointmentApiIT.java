@@ -1,6 +1,7 @@
 package cz.uhk.ordinace.appointment;
 
 import static org.hamcrest.Matchers.hasSize;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -85,10 +86,13 @@ class AppointmentApiIT extends AbstractDbIT {
     @Test
     void cancelledSlotCanBeBookedAgainAndDisappearsFromDiary() throws Exception {
         long doctor = doctor("Vyhlídalová");
-        long first = idOf(book(doctor, patient(25), "10:00", 15).andExpect(status().isCreated()));
+        long first = idOf(book(doctor, patient(25), "10:00", 15).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.createdBy").value("recepce")));
 
-        mvc.perform(post("/api/appointments/{id}/cancel", first)).andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("CANCELLED"));
+        mvc.perform(post("/api/appointments/{id}/cancel", first).with(user("vera"))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELLED"))
+                .andExpect(jsonPath("$.createdBy").value("recepce"))
+                .andExpect(jsonPath("$.updatedBy").value("vera"));
         book(doctor, patient(26), "10:00", 15).andExpect(status().isCreated());
 
         mvc.perform(get("/api/appointments").param("doctorId", String.valueOf(doctor))

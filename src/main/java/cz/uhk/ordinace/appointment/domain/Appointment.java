@@ -3,8 +3,13 @@ package cz.uhk.ordinace.appointment.domain;
 import java.time.Instant;
 import java.util.Optional;
 
+import org.springframework.data.annotation.CreatedBy;
+import org.springframework.data.annotation.LastModifiedBy;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
 import cz.uhk.ordinace.common.BusinessRuleException;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EntityListeners;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
@@ -16,6 +21,7 @@ import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "appointment")
+@EntityListeners(AuditingEntityListener.class)
 public class Appointment {
 
     @Id
@@ -40,6 +46,12 @@ public class Appointment {
     private Long rescheduledFromId;
 
     private Instant updatedAt;
+
+    @CreatedBy
+    private String createdBy;
+
+    @LastModifiedBy
+    private String updatedBy;
 
     protected Appointment() {
     }
@@ -130,5 +142,17 @@ public class Appointment {
 
     public Optional<Long> getRescheduledFromId() {
         return Optional.ofNullable(rescheduledFromId);
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public Optional<String> getCreatedBy() {
+        return Optional.ofNullable(createdBy);
+    }
+
+    public Optional<String> getUpdatedBy() {
+        return Optional.ofNullable(updatedBy);
     }
 }

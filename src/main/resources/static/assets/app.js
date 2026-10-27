@@ -587,7 +587,11 @@
         h('dt', { text: 'Lékař' }), h('dd', { text: doctorName(a.doctorId) }),
         h('dt', { text: 'Telefon' }), h('dd', {}, h('a', { href: `tel:${a.patientPhone}`, text: phone(a.patientPhone) })),
         h('dt', { text: 'Důvod' }), h('dd', { text: a.reason || '–' }),
-        h('dt', { text: 'Stav' }), h('dd', {}, statusChip(a))),
+        h('dt', { text: 'Stav' }), h('dd', {}, statusChip(a)),
+        a.createdBy ? [h('dt', { text: 'Objednal(a)' }), h('dd', { text: a.createdBy })] : null,
+        a.updatedBy && a.status !== 'BOOKED'
+          ? [h('dt', { text: 'Poslední změna' }), h('dd', { text: `${a.updatedBy}, ${fmtDateTime.format(new Date(a.updatedAt))}` })]
+          : null),
       a.needsRebooking && a.status === 'BOOKED' ? h('p', { class: 'notice warn', text: 'Lékař je v tomto čase nepřítomen. Domluvte s pacientem nový termín.' }) : null,
       err.el, actions));
   }

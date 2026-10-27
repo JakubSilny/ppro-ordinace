@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
@@ -76,6 +77,18 @@ class SchemaConstraintsIT extends AbstractDbIT {
                 "INSERT INTO patient (first_name, last_name, birth_year, phone, insurance_id) VALUES ('A', 'B', 1980, '123', ?)",
                 insuranceId))
                 .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void auditLogCannotBeChangedOrDeleted() {
+        jdbc.update("INSERT INTO audit_log (username, method, path, status) VALUES ('vera', 'GET', '/api/x', 200)");
+
+        assertThatThrownBy(() -> jdbc.update("UPDATE audit_log SET username = 'nikdo'"))
+                .isInstanceOf(DataAccessException.class).hasMessageContaining("append-only");
+        assertThatThrownBy(() -> jdbc.update("DELETE FROM audit_log"))
+                .isInstanceOf(DataAccessException.class).hasMessageContaining("append-only");
+        assertThatThrownBy(() -> jdbc.execute("TRUNCATE audit_log"))
+                .isInstanceOf(DataAccessException.class).hasMessageContaining("append-only");
     }
 
     private long id(String sql) {
