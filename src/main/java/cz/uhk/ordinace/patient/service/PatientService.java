@@ -70,6 +70,12 @@ public class PatientService {
         return patients.findById(id).orElseThrow(() -> new NotFoundException("Patient " + id + " not found"));
     }
 
+    /** Jako {@link #get}, ale řádek zůstane zamčený do konce volající transakce. */
+    @Transactional
+    public Patient lock(long id) {
+        return patients.findLockedById(id).orElseThrow(() -> new NotFoundException("Patient " + id + " not found"));
+    }
+
     @Transactional(readOnly = true)
     public Map<Long, Patient> getAll(Collection<Long> ids) {
         return patients.findAllById(ids).stream().collect(Collectors.toMap(Patient::getId, Function.identity()));
@@ -90,7 +96,7 @@ public class PatientService {
 
     @Transactional
     public Patient deactivate(long id) {
-        Patient patient = get(id);
+        Patient patient = lock(id);
         long upcoming = patients.countUpcomingBookings(id, clock.instant());
         if (upcoming > 0) {
             throw new BusinessRuleException("Patient has " + upcoming + " upcoming appointments");

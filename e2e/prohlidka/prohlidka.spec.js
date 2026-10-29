@@ -285,6 +285,10 @@ test('Prohlídka aplikace Ordinace Na Vyhlídce', async ({ page }) => {
     await expect(dialog.getByText('Poslední změna')).toBeVisible();
     await caption(page, 'U každé rezervace je vidět, kdo ji objednal a kdo ji naposledy změnil nebo zrušil.');
     await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: 'Kdo kartu zobrazil' }).click();
+    await expect(dialog.getByRole('cell', { name: /^rezervace \d+/ }).first()).toBeVisible();
+    await caption(page, 'Do záznamu přístupů se počítá i otevření rezervace nebo návštěvy pacienta, nejen karta.');
+    await page.keyboard.press('Escape');
 
     await page.getByRole('button', { name: 'Nový pacient' }).click();
     await dialog.getByLabel('Jméno', { exact: true }).fill(patient.first);

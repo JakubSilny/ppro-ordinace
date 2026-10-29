@@ -1,6 +1,7 @@
 package cz.uhk.ordinace.gdpr.service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.stereotype.Service;
@@ -41,14 +42,22 @@ public class PatientDataService {
     @Transactional(readOnly = true)
     public PatientData export(long patientId) {
         Patient patient = patients.get(patientId);
-        List<AppointmentWithVisit> history = appointments.patientHistory(patientId).stream()
-                .map(a -> new AppointmentWithVisit(a, visits.findByAppointment(a.getId()))).toList();
-        return new PatientData(patient, history);
+        List<Appointment> history = appointments.patientHistory(patientId);
+        Map<Long, VisitDetail> visitsByAppointment = visits.findByAppointments(ids(history));
+        return new PatientData(patient, history.stream()
+                .map(a -> new AppointmentWithVisit(a, Optional.ofNullable(visitsByAppointment.get(a.getId()))))
+                .toList());
     }
 
     @Transactional(readOnly = true)
     public List<AuditEntry> accessLog(long patientId) {
-        patients.get(patientId);
-        return audit.forPatient(patientId);
+        List<Long> appointmentIds = ids(appointments.patientHistory(patientId));
+        List<Long> visitIds = visits.findByAppointments(appointmentIds).values().stream()
+                .map(v -> v.visit().getId()).toList();
+        return audit.forPatient(patientId, appointmentIds, visitIds);
+    }
+
+    private static List<Long> ids(List<Appointment> appointments) {
+        return appointments.stream().map(Appointment::getId).toList();
     }
 }

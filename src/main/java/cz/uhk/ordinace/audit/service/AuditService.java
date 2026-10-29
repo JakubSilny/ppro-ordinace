@@ -1,9 +1,10 @@
 package cz.uhk.ordinace.audit.service;
 
 import java.time.Clock;
+import java.util.Collection;
 import java.util.List;
+import java.util.stream.Collectors;
 
-import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,10 +28,20 @@ public class AuditService {
         entries.save(new AuditEntry(clock.instant(), username, method, path, status));
     }
 
-    /** Poslední přístupy k záznamu pacienta, např. pro jeho žádost podle čl. 15 GDPR. */
+    /**
+     * Posledních 500 přístupů k údajům pacienta (karta, jeho rezervace a návštěvy), např. pro žádost podle čl. 15
+     * GDPR. Hromadné přehledy (diář, výkaz) z cesty nepoznají, koho se týkaly, takže tu nejsou.
+     */
     @Transactional(readOnly = true)
-    public List<AuditEntry> forPatient(long patientId) {
-        return entries.findForPaths("/api/patients/" + patientId, "/api/appointments/by-patient/" + patientId,
-                Limit.of(500));
+    public List<AuditEntry> forPatient(long patientId, Collection<Long> appointmentIds, Collection<Long> visitIds) {
+        // id jsou čísla, do regulárního výrazu se tedy nic cizího nedostane
+        String regex = "^/api/(patients/" + patientId + "|appointments/by-patient/" + patientId
+                + anyOf("appointments", appointmentIds) + anyOf("visits", visitIds) + ")(/.*)?$";
+        return entries.findByPathMatching(regex);
+    }
+
+    private static String anyOf(String prefix, Collection<Long> ids) {
+        return ids.isEmpty() ? ""
+                : "|" + prefix + "/(" + ids.stream().map(String::valueOf).collect(Collectors.joining("|")) + ")";
     }
 }

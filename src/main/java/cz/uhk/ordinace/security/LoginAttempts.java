@@ -35,6 +35,7 @@ class LoginAttempts {
     }
 
     void failed(String username) {
+        byUser.values().removeIf(this::expired); // jinak by mapu nafouklo hádání náhodných jmen
         byUser.compute(key(username), (k, f) -> f == null || expired(f)
                 ? new Failures(1, clock.instant())
                 : new Failures(f.count() + 1, clock.instant()));
@@ -42,6 +43,10 @@ class LoginAttempts {
 
     void succeeded(String username) {
         byUser.remove(key(username));
+    }
+
+    int trackedNames() {
+        return byUser.size();
     }
 
     private boolean expired(Failures f) {

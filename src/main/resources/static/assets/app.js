@@ -821,7 +821,14 @@
           h('td', { text: fmtDateTime.format(new Date(e.at)) }),
           h('td', { text: e.username }),
           h('td', { text: ACTION[e.method] || e.method }),
-          h('td', { class: 'muted', text: e.path.replace(`/api/patients/${p.id}`, 'karta').replace(`/api/appointments/by-patient/${p.id}`, 'termíny') })))))), { wide: true });
+          h('td', { class: 'muted', text: accessPart(e.path, p.id) })))))), { wide: true });
+  }
+
+  function accessPart(path, patientId) {
+    return path.replace(`/api/patients/${patientId}`, 'karta').replace(`/api/appointments/by-patient/${patientId}`, 'termíny')
+      .replace(/^\/api\/appointments\/(\d+)\/visit$/, 'návštěva (rezervace $1)')
+      .replace(/^\/api\/appointments\/(\d+)/, 'rezervace $1')
+      .replace(/^\/api\/visits\/(\d+).*$/, 'návštěva $1');
   }
 
   async function openPatientForm(existing, onSaved) {

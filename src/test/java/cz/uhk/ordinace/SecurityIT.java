@@ -2,6 +2,8 @@ package cz.uhk.ordinace;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestBuilders.formLogin;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -85,5 +87,22 @@ class SecurityIT extends AbstractDbIT {
                 .andExpect(header().string("Content-Disposition", containsString("attachment")));
         anonymous.perform(get("/api/patients/{id}/access-log", patient).with(user("vera")))
                 .andExpect(jsonPath("$[0].username").value("vera"));
+    }
+
+    @Test
+    void accessLogIncludesReadsOfThePatientsAppointmentsButNotOthers() throws Exception {
+        long patient = jdbc.queryForObject("SELECT id FROM patient ORDER BY id OFFSET 71 LIMIT 1", Long.class);
+        long doctor = jdbc.queryForObject("SELECT id FROM doctor WHERE last_name = 'Kolář'", Long.class);
+        long appointment = jdbc.queryForObject("""
+                INSERT INTO appointment (doctor_id, patient_id, start_at, end_at, status)
+                VALUES (?, ?, now() + interval '400 days', now() + interval '400 days 15 minutes', 'BOOKED')
+                RETURNING id""", Long.class, doctor, patient);
+
+        anonymous.perform(get("/api/appointments/{id}", appointment).with(user("olga"))).andExpect(status().isOk());
+        anonymous.perform(get("/api/appointments/{id}", appointment * 10).with(user("olga")));
+
+        anonymous.perform(get("/api/patients/{id}/access-log", patient).with(user("olga")))
+                .andExpect(jsonPath("$[*].path", hasItem("/api/appointments/" + appointment)))
+                .andExpect(jsonPath("$[*].path", not(hasItem("/api/appointments/" + appointment * 10))));
     }
 }

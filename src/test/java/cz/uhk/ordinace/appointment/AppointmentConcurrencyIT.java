@@ -19,11 +19,14 @@ import java.util.concurrent.Future;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import cz.uhk.ordinace.AbstractDbIT;
 import cz.uhk.ordinace.appointment.dto.CreateAppointmentRequest;
+import cz.uhk.ordinace.appointment.dto.RescheduleRequest;
 import cz.uhk.ordinace.appointment.service.AppointmentService;
+import cz.uhk.ordinace.common.BusinessRuleException;
 import cz.uhk.ordinace.common.ConflictException;
 
 class AppointmentConcurrencyIT extends AbstractDbIT {
@@ -66,5 +69,41 @@ class AppointmentConcurrencyIT extends AbstractDbIT {
         assertThat(winners).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM appointment WHERE doctor_id = ? AND start_at = ?",
                 Integer.class, doctor, java.sql.Timestamp.from(start))).isEqualTo(1);
+    }
+
+    @Test
+    void twoSimultaneousReschedulesOfTheSameAppointmentHaveOneWinner() throws Exception {
+        long doctor = jdbc.queryForObject("SELECT id FROM doctor WHERE last_name = 'Kolář'", Long.class);
+        long patient = jdbc.queryForObject("SELECT id FROM patient ORDER BY id OFFSET 42 LIMIT 1", Long.class);
+        LocalDate monday = LocalDate.now(ZoneId.of("Europe/Prague")).plusWeeks(10)
+                .with(TemporalAdjusters.nextOrSame(DayOfWeek.MONDAY));
+        var start = ZonedDateTime.of(monday, LocalTime.of(7, 0), ZoneId.of("Europe/Prague"));
+        long original = service.create(new CreateAppointmentRequest(doctor, patient, start.toInstant(), 15, null))
+                .getId();
+
+        CyclicBarrier barrier = new CyclicBarrier(2);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        List<Future<Boolean>> results = new ArrayList<>();
+        for (int minutes : new int[] { 30, 45 }) {
+            Callable<Boolean> task = () -> {
+                barrier.await();
+                try {
+                    service.reschedule(original, new RescheduleRequest(start.plusMinutes(minutes).toInstant(), null));
+                    return true;
+                } catch (OptimisticLockingFailureException | BusinessRuleException e) {
+                    return false;
+                }
+            };
+            results.add(pool.submit(task));
+        }
+        long winners = 0;
+        for (Future<Boolean> f : results) {
+            winners += f.get() ? 1 : 0;
+        }
+        pool.shutdown();
+
+        assertThat(winners).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM appointment WHERE rescheduled_from_id = ?",
+                Integer.class, original)).isEqualTo(1);
     }
 }

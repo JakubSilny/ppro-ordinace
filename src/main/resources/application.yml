@@ -7,6 +7,11 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: validate
+  flyway:
+    # demo data mají verzi V100: novější migrace (V5…) se musí spustit i po ní a po vypnutí dema nesmí
+    # chybějící V100 zastavit start
+    out-of-order: true
+    ignore-migration-patterns: "*:missing"
   jackson:
     time-zone: Europe/Prague
 server:

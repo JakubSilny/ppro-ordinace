@@ -87,7 +87,7 @@ class PatientServiceTest {
     @Test
     void patientWithUpcomingBookingsCannotBeDeactivated() {
         Patient p = existing(3);
-        when(repository.findById(3L)).thenReturn(Optional.of(p));
+        when(repository.findLockedById(3L)).thenReturn(Optional.of(p));
         when(repository.countUpcomingBookings(3L, clock.instant())).thenReturn(2L);
 
         assertThatThrownBy(() -> service().deactivate(3)).isInstanceOf(BusinessRuleException.class);

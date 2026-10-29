@@ -55,8 +55,8 @@ class AppointmentServiceTest {
     @BeforeEach
     void setUp() {
         service = new AppointmentService(appointments, doctors, patients, clock);
-        lenient().when(doctors.get(1L)).thenReturn(new Doctor("Marie", "Vyhlídalová"));
-        lenient().when(patients.get(2L)).thenReturn(
+        lenient().when(doctors.lock(1L)).thenReturn(new Doctor("Marie", "Vyhlídalová"));
+        lenient().when(patients.lock(2L)).thenReturn(
                 new Patient("Jan", "Novák", 1980, "602111222", Optional.empty(), Optional.empty()));
         lenient().when(doctors.getOfficeHours(1L)).thenReturn(List.of(
                 hours(1, "08:00", "12:00", true), hours(1, "13:00", "16:00", true), hours(2, "08:00", "12:00", false)));

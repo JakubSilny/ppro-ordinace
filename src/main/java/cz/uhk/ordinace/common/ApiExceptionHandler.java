@@ -1,6 +1,7 @@
 package cz.uhk.ordinace.common;
 
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -26,6 +27,12 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(BusinessRuleException.class)
     ProblemDetail unprocessable(BusinessRuleException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage());
+    }
+
+    /** Záznam mezitím změnil někdo jiný ({@code @Version}); stačí načíst znovu a zopakovat. */
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    ProblemDetail staleData(OptimisticLockingFailureException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, "Record was changed by someone else, reload it");
     }
 
     /** Pojistka: pravidlo, které prošlo aplikací, ale zastavila ho databáze (např. souběh). */
