@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import cz.uhk.ordinace.gdpr.dto.AccessLogResponse;
+import cz.uhk.ordinace.audit.dto.AuditEntryResponse;
 import cz.uhk.ordinace.gdpr.dto.PatientDataResponse;
 import cz.uhk.ordinace.gdpr.service.PatientDataService;
 
@@ -34,7 +34,7 @@ public class PatientDataController {
     }
 
     @GetMapping("/access-log")
-    List<AccessLogResponse> accessLog(@PathVariable long id) {
-        return data.accessLog(id).stream().map(AccessLogResponse::from).toList();
+    List<AuditEntryResponse> accessLog(@PathVariable long id) {
+        return data.accessLog(id).stream().map(AuditEntryResponse::from).toList();
     }
 }

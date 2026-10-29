@@ -9,7 +9,7 @@ import cz.uhk.ordinace.audit.service.AuditService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-/** Zapisuje každé volání API s osobními údaji; dotaz (např. hledané jméno) se neukládá. */
+/** Zapisuje každé volání API přihlášeného uživatele; dotaz (např. hledané jméno) se neukládá. */
 @Component
 class AuditInterceptor implements HandlerInterceptor {
 

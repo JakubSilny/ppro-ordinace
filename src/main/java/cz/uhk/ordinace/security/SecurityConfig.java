@@ -2,7 +2,9 @@ package cz.uhk.ordinace.security;
 
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -26,6 +28,7 @@ import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 
 /**
  * Přihlášení formulářem, účty z proměnné prostředí {@code APP_USERS} ve tvaru {@code jmeno:heslo,jmeno2:heslo2}.
+ * Jména v {@code APP_ADMINS} jsou správci (Super Admin): mají vše jako personál a navíc celý záznam přístupů.
  * API vrací 401 místo přesměrování; CSRF token jde v cookie XSRF-TOKEN a vrací se v hlavičce X-XSRF-TOKEN.
  */
 @Configuration
@@ -38,6 +41,7 @@ public class SecurityConfig {
     SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http.authorizeHttpRequests(auth -> auth
                 .requestMatchers("/login.html", "/assets/**", "/favicon.svg").permitAll()
+                .requestMatchers("/api/audit/**").hasRole("ADMIN")
                 .anyRequest().authenticated())
                 .formLogin(form -> form.loginPage("/login.html").loginProcessingUrl("/login")
                         .defaultSuccessUrl("/", true).failureHandler(failureHandler()).permitAll())
@@ -63,16 +67,27 @@ public class SecurityConfig {
 
     /** Heslo může být i hash, např. {@code {bcrypt}$2y$10$...}; pak se použije tak, jak je. */
     @Bean
-    UserDetailsService users(@Value("${app.users}") String users, PasswordEncoder encoder, LoginAttempts attempts) {
+    UserDetailsService users(@Value("${app.users}") String users, @Value("${app.admins:}") String admins,
+            PasswordEncoder encoder, LoginAttempts attempts) {
+        Set<String> adminNames = Arrays.stream(admins.split(",")).map(String::trim).filter(s -> !s.isEmpty())
+                .collect(Collectors.toSet());
         InMemoryUserDetailsManager manager = new InMemoryUserDetailsManager();
         Arrays.stream(users.split(",")).map(String::trim).filter(s -> !s.isEmpty()).forEach(entry -> {
             int colon = entry.indexOf(':');
             if (colon < 1 || colon == entry.length() - 1) {
                 throw new IllegalStateException("APP_USERS entries must look like name:password");
             }
+            String name = entry.substring(0, colon);
+            if (manager.userExists(name)) {
+                throw new IllegalStateException("APP_USERS contains " + name + " twice");
+            }
             String password = entry.substring(colon + 1);
-            manager.createUser(User.withUsername(entry.substring(0, colon))
-                    .password(password.startsWith("{") ? password : encoder.encode(password)).roles("STAFF").build());
+            String[] roles = adminNames.contains(name) ? new String[] { "STAFF", "ADMIN" } : new String[] { "STAFF" };
+            manager.createUser(User.withUsername(name)
+                    .password(password.startsWith("{") ? password : encoder.encode(password)).roles(roles).build());
+        });
+        adminNames.stream().filter(n -> !manager.userExists(n)).findFirst().ifPresent(n -> {
+            throw new IllegalStateException("APP_ADMINS contains " + n + ", who is not in APP_USERS");
         });
         if (!manager.userExists(firstName(users))) {
             throw new IllegalStateException("Set APP_USERS, e.g. APP_USERS=recepce:a-long-password");

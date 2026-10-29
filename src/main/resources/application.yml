@@ -25,3 +25,4 @@ server:
   forward-headers-strategy: framework
 app:
   users: ${APP_USERS:}
+  admins: ${APP_ADMINS:}

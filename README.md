@@ -30,7 +30,7 @@ cp .env.example .env           # pro vyzkoušení stačí beze změny
 docker compose up --build -d   # první sestavení trvá několik minut
 ```
 
-Aplikace poběží na **http://localhost:8080**. S nezměněným `.env.example` se přihlásíte jménem **`recepce`** a heslem **`zmente-toto-heslo`**. Pro ostrý provoz nastavte v `.env` vlastní heslo databáze (`DB_PASSWORD`) a účty personálu v `APP_USERS` (formát `jmeno:heslo,jmeno2:heslo2`). Bez účtů aplikace odmítne nastartovat. Zastavení: `docker compose down`.
+Aplikace poběží na **http://localhost:8080**. S nezměněným `.env.example` se přihlásíte jménem **`recepce`** a heslem **`zmente-toto-heslo`**, jako správce jménem **`spravce`** a heslem **`zmente-heslo-spravce`**. Pro ostrý provoz nastavte v `.env` vlastní heslo databáze (`DB_PASSWORD`) a účty personálu v `APP_USERS` (formát `jmeno:heslo,jmeno2:heslo2`). Bez účtů aplikace odmítne nastartovat. Zastavení: `docker compose down`.
 
 Databáze PostgreSQL je dostupná jen z tohoto počítače (`127.0.0.1:5432`). Schéma i výchozí data (číselníky, lékaři, 100 syntetických pacientů) založí migrace Flyway při prvním startu.
 
@@ -40,6 +40,7 @@ S profilem `demo` (výchozí v `.env.example`) se navíc založí ukázkový pro
 |---|---|
 | `DB_NAME`, `DB_USER`, `DB_PASSWORD` | databáze |
 | `APP_USERS` | účty personálu, `jmeno:heslo` oddělené čárkou; heslo může být bcrypt hash (viz níže) |
+| `APP_ADMINS` | jména správců (Super Admin) oddělená čárkou; mají vše jako personál a navíc záložku „Záznam přístupů“ s celým logem. Každé jméno musí být i v `APP_USERS` |
 | `COOKIE_SECURE` | `true`, pokud aplikace běží za HTTPS proxy |
 | `SPRING_PROFILES_ACTIVE` | `demo` = ukázková data (jen pro předvedení) |
 
@@ -57,7 +58,7 @@ Pro provoz mimo jeden počítač patří aplikace za reverzní proxy s HTTPS (na
 Prohlížečové testy (Playwright) běží proti spuštěné aplikaci:
 
 ```bash
-APP_USERS=e2e:e2e-password-123 docker compose up --build -d
+APP_USERS=e2e:e2e-password-123,e2e-admin:e2e-admin-password-123 APP_ADMINS=e2e-admin docker compose up --build -d
 cd e2e && npm ci && npx playwright install chromium && npm test
 ```
 
@@ -66,7 +67,7 @@ cd e2e && npm ci && npx playwright install chromium && npm test
 `e2e/prohlidka/` je samostatný scénář, který v okně prohlížeče pomalu projde všechny funkce s českými popisky: přihlášení, diář, objednání nového pacienta, přesun, zrušení, akutního pacienta se zápisem výkonů, nemoc lékaře a přeobjednání, kartotéku s GDPR, výkaz, přehled rušení a tablet. Nahraje přitom video (`e2e/test-results/**/video.webm`), které lze klientovi poslat.
 
 ```bash
-SPRING_PROFILES_ACTIVE=demo APP_USERS=e2e:e2e-password-123 docker compose up --build -d
+SPRING_PROFILES_ACTIVE=demo APP_USERS=e2e:e2e-password-123,e2e-admin:e2e-admin-password-123 APP_ADMINS=e2e-admin docker compose up --build -d
 cd e2e && npm run prohlidka            # tempo: PAUSE=2500 (ms na popisek), SLOWMO=400 (ms na akci)
 ```
 
@@ -111,6 +112,7 @@ Projekt vznikal s agentem Claude Code (modely Claude Sonnet 5.5 a Claude Opus 5.
 | `GET /api/appointments/cancellation-stats?from&to` | kdo ruší |
 | `GET /api/patients?query`, `POST /api/patients` | hledání a zakládání pacientů |
 | `GET /api/patients/{id}/export`, `/access-log` | údaje pacienta a záznam přístupů |
+| `GET /api/audit?from&to&username` | celý záznam přístupů, jen správce (jinak 403) |
 | `POST /api/doctors/{id}/absences` | nepřítomnost lékaře |
 
 Chyby se vrací jako `application/problem+json`: 404 (neexistuje), 409 (kolize, duplicita), 422 (porušené pravidlo, např. mimo ordinační hodiny).
@@ -120,7 +122,7 @@ Chyby se vrací jako `application/problem+json`: 404 (neexistuje), 409 (kolize, 
 Systém zpracovává zdravotní údaje (zvláštní kategorie podle čl. 9 GDPR), proto:
 
 - **Přístup jen po přihlášení.** Odhlášení po 30 minutách nečinnosti, cookie `HttpOnly` a `SameSite=Strict`, ochrana proti CSRF.
-- **Záznam přístupů.** Každé volání API s osobními údaji a každý pokus o přihlášení se zapíše do tabulky `audit_log` (kdo, kdy, co). Hledané výrazy se neukládají. Na kartě pacienta je vidět, kdo ji zobrazil. Záznam nejde upravit ani smazat, hlídá to trigger v databázi.
+- **Záznam přístupů.** Každé volání API a každý pokus o přihlášení se zapíše do tabulky `audit_log` (kdo, kdy, co). Hledané výrazy ani obsah karet se neukládají. Na kartě pacienta je vidět, kdo ji zobrazil, správce vidí v záložce „Záznam přístupů“ celý log všech uživatelů. Záznam nejde upravit ani smazat, hlídá to trigger v databázi.
 - **Kdo co změnil.** U rezervace je vidět, kdo ji objednal a kdo ji naposledy změnil (zrušil, přesunul, zapsal návštěvu).
 - **Ochrana přihlášení.** Po 5 špatných heslech se jméno na 5 minut zablokuje, i když existuje jen v hlavě útočníka.
 - **Právo na přístup a přenositelnost (čl. 15 a 20).** Tlačítkem „Stáhnout všechny údaje“ se stáhne JSON se všemi údaji pacienta, rezervacemi a návštěvami.
@@ -154,4 +156,4 @@ Systém zpracovává zdravotní údaje (zvláštní kategorie podle čl. 9 GDPR)
 - **P22 Výkaz.** Jen z dokončených návštěv a nestornovaných výkonů. Souhrn podle kódu, jednotlivé řádky s číslem pojištěnce a export do CSV.
 - **P23 Volné termíny.** Pro lékaře, týden a délku termínu se počítají souvislá volná okna (ordinační hodiny minus rezervace, nepřítomnosti a uplynulý čas).
 - **N1 Rozhraní.** Jedna stránka pro recepci s velkými ovládacími prvky a písmem pro snadné čtení, rychlým hledáním pacienta v horní liště a podporou tabletu.
-- **T2 Přihlášení.** Původně bez přihlášení, kvůli zdravotním údajům doplněno přihlášení personálu (účty z proměnné prostředí) a záznam přístupů. Role nerozlišujeme, protože recepce i lékaři potřebují stejné funkce.
+- **T2 Přihlášení.** Původně bez přihlášení, kvůli zdravotním údajům doplněno přihlášení personálu (účty z proměnné prostředí) a záznam přístupů. Recepce a lékaři mají stejnou roli, protože potřebují stejné funkce. Jen správce (`APP_ADMINS`) navíc vidí celý záznam přístupů všech uživatelů (činnosti i surový API log), aby šlo kontrolovat, kdo co dělal (GDPR čl. 32).

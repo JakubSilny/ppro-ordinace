@@ -2,7 +2,9 @@ package cz.uhk.ordinace;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestBuilders.formLogin;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
@@ -13,6 +15,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.time.LocalDate;
+import java.time.ZoneId;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -104,5 +109,22 @@ class SecurityIT extends AbstractDbIT {
         anonymous.perform(get("/api/patients/{id}/access-log", patient).with(user("olga")))
                 .andExpect(jsonPath("$[*].path", hasItem("/api/appointments/" + appointment)))
                 .andExpect(jsonPath("$[*].path", not(hasItem("/api/appointments/" + appointment * 10))));
+    }
+
+    @Test
+    void wholeAuditLogIsOnlyForAdmin() throws Exception {
+        String today = LocalDate.now(ZoneId.of("Europe/Prague")).toString();
+        anonymous.perform(get("/api/doctors").with(user("hana"))).andExpect(status().isOk());
+
+        anonymous.perform(get("/api/audit").param("from", today).param("to", today).with(user("hana")))
+                .andExpect(status().isForbidden());
+        anonymous.perform(get("/api/audit").param("from", today).param("to", today).param("username", "hana")
+                .with(user("spravce").roles("STAFF", "ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].path", hasItem("/api/doctors")))
+                .andExpect(jsonPath("$[*].username", everyItem(is("hana"))));
+        anonymous.perform(get("/api/me").with(user("spravce").roles("STAFF", "ADMIN")))
+                .andExpect(jsonPath("$.admin").value(true));
+        anonymous.perform(get("/api/me").with(user("hana"))).andExpect(jsonPath("$.admin").value(false));
     }
 }
