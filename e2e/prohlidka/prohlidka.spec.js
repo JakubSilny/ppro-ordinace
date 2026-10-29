@@ -1,7 +1,7 @@
 // Prohlídka celé aplikace pro klienta: pomalé proklikání všech funkcí s popisky a videem.
 // Spuštění: npm run prohlidka  (nejlépe nad ukázkovými daty, SPRING_PROFILES_ACTIVE=demo)
 const { test, expect } = require('@playwright/test');
-const { USER, PASSWORD } = require('../tests/helpers');
+const { USER, PASSWORD, ADMIN, ADMIN_PASSWORD } = require('../tests/helpers');
 
 const PAUSE = Number(process.env.PAUSE ?? 1500);
 const DOCTORS = ['MUDr. Kolář', 'MUDr. Marešová', 'MUDr. Vyhlídalová'];
@@ -346,6 +346,21 @@ test('Prohlídka aplikace Ordinace Na Vyhlídce', async ({ page }) => {
     await page.setViewportSize({ width: 820, height: 1180 });
     await caption(page, 'Stejné rozhraní funguje i na tabletu.');
     await page.setViewportSize({ width: 1440, height: 900 });
+  });
+
+  await test.step('Správce: záznam přístupů', async () => {
+    await page.getByRole('button', { name: 'Odhlásit' }).click();
+    await caption(page, 'Správce (Super Admin) má vše jako recepce a navíc vidí, kdo co v systému dělal.');
+    await page.getByLabel('Uživatelské jméno').fill(ADMIN);
+    await page.getByLabel('Heslo').pressSequentially(ADMIN_PASSWORD, { delay: 40 });
+    await page.getByRole('button', { name: 'Přihlásit se' }).click();
+    await page.getByRole('link', { name: 'Záznam přístupů' }).click();
+    await expect(page.locator('#audit table')).toBeVisible();
+    await caption(page, 'Činnosti všech uživatelů za den: přihlášení, nahlédnutí do karet, rezervace, výkazy…');
+    await caption(page, 'Zablokované pokusy o přihlášení jsou tu taky. Obsah karet se do záznamu neukládá.');
+    await page.getByLabel('Zobrazení').selectOption('api');
+    await expect(page.locator('#audit th', { hasText: 'Stav' })).toBeVisible();
+    await caption(page, 'API log: technický pohled s cestou a HTTP stavem, včetně odmítnutých požadavků.');
   });
 
   await test.step('Odhlášení', async () => {

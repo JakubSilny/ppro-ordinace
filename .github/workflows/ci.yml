@@ -82,7 +82,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
-      APP_USERS: e2e:e2e-password-123
+      APP_USERS: e2e:e2e-password-123,e2e-admin:e2e-admin-password-123
+      APP_ADMINS: e2e-admin
       E2E_USER: e2e
       E2E_PASSWORD: e2e-password-123
     steps:

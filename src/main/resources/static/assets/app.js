@@ -200,7 +200,7 @@
 
   // ---------- Navigace ----------
 
-  const VIEWS = ['diar', 'rozpis', 'pacienti', 'preobjednat', 'vykazy', 'ruseni'];
+  const VIEWS = ['diar', 'rozpis', 'pacienti', 'preobjednat', 'vykazy', 'ruseni', 'zaznam'];
 
   function route() {
     const [view, param] = location.hash.replace('#', '').split('/');
@@ -220,6 +220,7 @@
     if (current === 'preobjednat') loadRebooking();
     if (current === 'vykazy' && !$('#report').hasChildNodes()) loadReport();
     if (current === 'ruseni' && !$('#stats').hasChildNodes()) loadStats();
+    if (current === 'zaznam' && !$('#audit').hasChildNodes()) loadAudit();
   }
 
   const go = (hash) => {
@@ -821,15 +822,9 @@
           h('td', { text: fmtDateTime.format(new Date(e.at)) }),
           h('td', { text: e.username }),
           h('td', { text: ACTION[e.method] || e.method }),
-          h('td', { class: 'muted', text: accessPart(e.path, p.id) })))))), { wide: true });
+          h('td', { class: 'muted', text: describePath(e.path).text })))))), { wide: true });
   }
 
-  function accessPart(path, patientId) {
-    return path.replace(`/api/patients/${patientId}`, 'karta').replace(`/api/appointments/by-patient/${patientId}`, 'termíny')
-      .replace(/^\/api\/appointments\/(\d+)\/visit$/, 'návštěva (rezervace $1)')
-      .replace(/^\/api\/appointments\/(\d+)/, 'rezervace $1')
-      .replace(/^\/api\/visits\/(\d+).*$/, 'návštěva $1');
-  }
 
   async function openPatientForm(existing, onSaved) {
     const insurers = await run(loadInsurers);
@@ -1013,6 +1008,88 @@
         h('td', { class: 'num' }, h('strong', { text: s.cancelled + s.noShow }))))))));
   }
 
+  // ---------- Záznam přístupů (správce) ----------
+
+  // pořadí je důležité: konkrétnější cesty před obecnými
+  const PATHS = [
+    [/^\/login$/, () => 'přihlášení'],
+    [/^\/api\/patients\/(\d+)\/export$/, (m) => ['export údajů pacienta', m[1]]],
+    [/^\/api\/patients\/(\d+)\/access-log$/, (m) => ['záznam přístupů pacienta', m[1]]],
+    [/^\/api\/patients\/(\d+)\/deactivate$/, (m) => ['vyřazení pacienta', m[1]]],
+    [/^\/api\/patients\/(\d+)$/, (m) => ['karta pacienta', m[1]]],
+    [/^\/api\/patients$/, () => 'hledání nebo založení pacienta'],
+    [/^\/api\/appointments\/by-patient\/(\d+)$/, (m) => ['termíny pacienta', m[1]]],
+    [/^\/api\/appointments\/free-slots$/, () => 'volné termíny'],
+    [/^\/api\/appointments\/needs-rebooking$/, () => 'seznam k přeobjednání'],
+    [/^\/api\/appointments\/cancellation-stats$/, () => 'přehled rušení'],
+    [/^\/api\/appointments\/(\d+)\/visit$/, (m) => `návštěva (rezervace ${m[1]})`],
+    [/^\/api\/appointments\/(\d+)\/cancel$/, (m) => `zrušení rezervace ${m[1]}`],
+    [/^\/api\/appointments\/(\d+)\/no-show$/, (m) => `nepřišel (rezervace ${m[1]})`],
+    [/^\/api\/appointments\/(\d+)\/reschedule$/, (m) => `přesun rezervace ${m[1]}`],
+    [/^\/api\/appointments\/(\d+)$/, (m) => `rezervace ${m[1]}`],
+    [/^\/api\/appointments$/, () => 'diář nebo nová rezervace'],
+    [/^\/api\/visits\/(\d+)\/procedures\/\d+\/void$/, (m) => `storno výkonu (návštěva ${m[1]})`],
+    [/^\/api\/visits\/(\d+)\/procedures$/, (m) => `zápis výkonu (návštěva ${m[1]})`],
+    [/^\/api\/visits\/(\d+)\/note$/, (m) => `poznámka k návštěvě ${m[1]}`],
+    [/^\/api\/doctors\/(\d+)\/absences$/, () => 'nepřítomnost lékaře'],
+    [/^\/api\/doctors\/(\d+)\/office-hours$/, () => 'ordinační hodiny'],
+    [/^\/api\/doctors/, () => 'lékaři'],
+    [/^\/api\/reports\/monthly\.csv$/, () => 'export výkazu do CSV'],
+    [/^\/api\/reports/, () => 'měsíční výkaz'],
+    [/^\/api\/audit$/, () => 'záznam přístupů'],
+    [/^\/api\/(insurers|procedures)$/, () => 'číselník'],
+  ];
+
+  /** Cesta API česky; {@code patientId}, když se týká konkrétního pacienta. */
+  function describePath(path) {
+    for (const [re, label] of PATHS) {
+      const m = path.match(re);
+      if (!m) continue;
+      const r = label(m);
+      return Array.isArray(r) ? { text: `${r[0]} ${r[1]}`, patientId: Number(r[1]) } : { text: r };
+    }
+    return { text: path };
+  }
+
+  function describeAction(e) {
+    if (e.path === '/login') return { 200: 'Přihlášení', 401: 'Špatné heslo', 423: 'Zablokované přihlášení' }[e.status] || 'Přihlášení';
+    if (e.status >= 400) return `Odmítnuto (${e.status})`;
+    return { GET: 'Zobrazení', POST: 'Změna', PUT: 'Úprava', DELETE: 'Smazání' }[e.method] || e.method;
+  }
+
+  async function loadAudit() {
+    const from = $('#audit-from').value;
+    const to = $('#audit-to').value;
+    if (!from || !to) return;
+    const user = encodeURIComponent($('#audit-user').value.trim());
+    const log = await run(() => api(`/api/audit?from=${from}&to=${to}&username=${user}`));
+    if (!log) return;
+    const raw = $('#audit-mode').value === 'api';
+    // v Činnostech nejsou číselníky, které stránka načítá sama při každém otevření
+    const rows = raw ? log : log.filter((e) => !(e.method === 'GET' && /^\/api\/(doctors|insurers|procedures)$/.test(e.path)));
+    const target = $('#audit');
+    if (rows.length === 0) {
+      target.replaceChildren(h('div', { class: 'card empty' }, h('p', { text: 'V tomto období nejsou žádné záznamy.' })));
+      return;
+    }
+    const head = raw ? ['Kdy', 'Kdo', 'Metoda', 'Cesta', 'Stav'] : ['Kdy', 'Kdo', 'Akce', 'Co'];
+    const row = (e) => {
+      const when = h('td', { text: fmtDateTime.format(new Date(e.at)) });
+      if (raw) {
+        return h('tr', {}, when, h('td', { text: e.username }), h('td', { text: e.method }),
+          h('td', { class: 'muted', text: e.path }), h('td', { class: 'num', text: e.status }));
+      }
+      const what = describePath(e.path);
+      return h('tr', {}, when, h('td', { text: e.username }), h('td', { text: describeAction(e) }),
+        h('td', {}, what.patientId ? h('a', { href: `#pacienti/${what.patientId}`, text: what.text }) : what.text));
+    };
+    target.replaceChildren(
+      h('p', { class: 'muted', text: log.length >= 1000 ? 'Zobrazeno posledních 1000 záznamů, zužte období.' : `${rows.length} záznamů` }),
+      h('div', { class: 'table-wrap' }, h('table', {},
+        h('thead', {}, h('tr', {}, head.map((t) => h('th', { text: t })))),
+        h('tbody', {}, rows.map(row)))));
+  }
+
   // ---------- Rychlé hledání v liště ----------
 
   function wireGlobalSearch() {
@@ -1064,6 +1141,8 @@
     $('#report-form').addEventListener('submit', (ev) => { ev.preventDefault(); loadReport(); });
     $('#day-form').addEventListener('submit', (ev) => { ev.preventDefault(); loadDay(); });
     $('#stats-form').addEventListener('submit', (ev) => { ev.preventDefault(); loadStats(); });
+    $('#audit-form').addEventListener('submit', (ev) => { ev.preventDefault(); loadAudit(); });
+    $('#audit-mode').addEventListener('change', loadAudit);
     $('#logout-form').addEventListener('submit', (ev) => { ev.target.querySelector('[name=_csrf]').value = csrfToken(); });
     wireGlobalSearch();
     // obnoví diář, když se recepce vrátí k oknu (jiný počítač mezitím mohl objednat)
@@ -1076,6 +1155,8 @@
     $('#day-date').value = isoDate(now);
     $('#stats-from').value = `${now.getFullYear()}-01-01`;
     $('#stats-to').value = isoDate(now);
+    $('#audit-from').value = isoDate(now);
+    $('#audit-to').value = isoDate(now);
   }
 
   async function init() {
@@ -1083,7 +1164,8 @@
     const data = await run(() => Promise.all([api('/api/me'), api('/api/doctors')]));
     if (!data) return;
     const [me, doctors] = data;
-    $('#username').textContent = me.username;
+    $('#username').textContent = me.admin ? `${me.username} · správce` : me.username;
+    $('#audit-tab').hidden = !me.admin;
     state.doctors = doctors;
     let saved = null;
     try { saved = Number(localStorage.getItem('doctorId')); } catch { /* jen pohodlí */ }

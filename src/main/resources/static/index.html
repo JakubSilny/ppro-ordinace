@@ -22,6 +22,7 @@
       <a href="#preobjednat" data-view="preobjednat">K přeobjednání <span class="badge" id="rebook-count" hidden></span></a>
       <a href="#vykazy" data-view="vykazy">Výkazy</a>
       <a href="#ruseni" data-view="ruseni">Rušení</a>
+      <a href="#zaznam" data-view="zaznam" id="audit-tab" hidden>Záznam přístupů</a>
     </nav>
     <div class="quick-search" role="search">
       <label class="visually-hidden" for="global-search">Najít pacienta</label>
@@ -150,6 +151,26 @@
         <button class="btn primary" type="submit">Zobrazit</button>
       </form>
       <div id="stats"></div>
+    </section>
+
+    <!-- Záznam přístupů (jen správce) -->
+    <section class="view" id="view-zaznam" aria-labelledby="zaznam-title" hidden>
+      <div class="pane-head">
+        <h1 id="zaznam-title">Záznam přístupů</h1>
+      </div>
+      <form class="filters" id="audit-form">
+        <label class="field"><span>Od</span><input id="audit-from" type="date" required></label>
+        <label class="field"><span>Do</span><input id="audit-to" type="date" required></label>
+        <label class="field"><span>Uživatel</span><input id="audit-user" type="search" placeholder="všichni" autocomplete="off"></label>
+        <label class="field"><span>Zobrazení</span>
+          <select id="audit-mode">
+            <option value="activity">Činnosti</option>
+            <option value="api">API log</option>
+          </select>
+        </label>
+        <button class="btn primary" type="submit">Zobrazit</button>
+      </form>
+      <div id="audit"></div>
     </section>
   </main>
 
