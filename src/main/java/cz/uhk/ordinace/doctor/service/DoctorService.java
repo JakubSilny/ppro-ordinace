@@ -7,6 +7,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.AuditorAware;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,13 +29,15 @@ public class DoctorService {
     private final DoctorRepository doctors;
     private final OfficeHoursRepository officeHours;
     private final DoctorAbsenceRepository absences;
+    private final AuditorAware<String> currentUser;
     private final Clock clock;
 
     public DoctorService(DoctorRepository doctors, OfficeHoursRepository officeHours,
-            DoctorAbsenceRepository absences, Clock clock) {
+            DoctorAbsenceRepository absences, AuditorAware<String> currentUser, Clock clock) {
         this.doctors = doctors;
         this.officeHours = officeHours;
         this.absences = absences;
+        this.currentUser = currentUser;
         this.clock = clock;
     }
 
@@ -46,6 +49,12 @@ public class DoctorService {
     @Transactional(readOnly = true)
     public Doctor get(long id) {
         return doctors.findById(id).orElseThrow(() -> new NotFoundException("Doctor " + id + " not found"));
+    }
+
+    /** Jako {@link #get}, ale řádek zůstane zamčený do konce volající transakce. */
+    @Transactional
+    public Doctor lock(long id) {
+        return doctors.findLockedById(id).orElseThrow(() -> new NotFoundException("Doctor " + id + " not found"));
     }
 
     @Transactional(readOnly = true)
@@ -62,7 +71,7 @@ public class DoctorService {
 
     @Transactional
     public Doctor deactivate(long id) {
-        Doctor doctor = get(id);
+        Doctor doctor = lock(id);
         long upcoming = doctors.countUpcomingBookings(id, clock.instant());
         if (upcoming > 0) {
             throw new BusinessRuleException("Doctor has " + upcoming + " upcoming appointments");
@@ -104,13 +113,14 @@ public class DoctorService {
     /** Zapíše absenci a označí dotčené rezervace ve stavu BOOKED k přeobjednání. */
     @Transactional
     public AbsenceResult addAbsence(long doctorId, AbsenceRequest req) {
-        get(doctorId);
+        lock(doctorId);
         if (!req.endAt().isAfter(req.startAt())) {
             throw new BusinessRuleException("Absence must end after it starts");
         }
         Optional<String> reason = Optional.ofNullable(req.reason()).map(String::trim).filter(s -> !s.isEmpty());
         DoctorAbsence saved = absences.save(new DoctorAbsence(doctorId, req.startAt(), req.endAt(), reason));
-        int flagged = absences.flagForRebooking(doctorId, req.startAt(), req.endAt());
+        int flagged = absences.flagForRebooking(doctorId, req.startAt(), req.endAt(),
+                currentUser.getCurrentAuditor().orElse(null));
         return new AbsenceResult(saved, flagged);
     }
 

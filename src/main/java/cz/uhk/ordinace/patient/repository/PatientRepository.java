@@ -5,12 +5,18 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import cz.uhk.ordinace.patient.domain.Patient;
+import jakarta.persistence.LockModeType;
 
 public interface PatientRepository extends JpaRepository<Patient, Long> {
+
+    /** Zamkne řádek do konce transakce, aby se objednání a vyřazení pacienta nepředběhly. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<Patient> findLockedById(long id);
 
     Optional<Patient> findByInsuranceId(String insuranceId);
 
@@ -37,7 +43,7 @@ public interface PatientRepository extends JpaRepository<Patient, Long> {
             """, nativeQuery = true)
     List<Patient> searchByPhone(@Param("digits") String digits);
 
-    @Query(value = "SELECT count(*) FROM appointment WHERE patient_id = :id AND status = 'BOOKED' AND start_at > :now",
+    @Query(value = "SELECT count(*) FROM appointment WHERE patient_id = :id AND status = 'BOOKED' AND end_at > :now",
             nativeQuery = true)
     long countUpcomingBookings(@Param("id") long id, @Param("now") Instant now);
 }

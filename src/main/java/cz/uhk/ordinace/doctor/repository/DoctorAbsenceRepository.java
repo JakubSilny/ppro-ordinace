@@ -19,11 +19,15 @@ public interface DoctorAbsenceRepository extends JpaRepository<DoctorAbsence, Lo
     List<DoctorAbsence> findByDoctorIdAndStartAtLessThanAndEndAtGreaterThanOrderByStartAt(long doctorId, Instant end,
             Instant start);
 
-    /** Označí aktivní (BOOKED) rezervace v době absence k přeobjednání; vrací jejich počet. */
+    /**
+     * Označí aktivní (BOOKED) rezervace v době absence k přeobjednání; vrací jejich počet. Hromadný UPDATE obchází
+     * JPA, proto autora a verzi ({@code @Version}) nastavuje sám.
+     */
     @Modifying
     @Query(value = """
-            UPDATE appointment SET needs_rebooking = TRUE, updated_at = now()
+            UPDATE appointment SET needs_rebooking = TRUE, updated_at = now(), updated_by = :user, version = version + 1
             WHERE doctor_id = :doctorId AND status = 'BOOKED' AND start_at < :end AND end_at > :start
             """, nativeQuery = true)
-    int flagForRebooking(@Param("doctorId") long doctorId, @Param("start") Instant start, @Param("end") Instant end);
+    int flagForRebooking(@Param("doctorId") long doctorId, @Param("start") Instant start, @Param("end") Instant end,
+            @Param("user") String user);
 }

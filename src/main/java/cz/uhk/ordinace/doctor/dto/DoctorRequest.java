@@ -1,6 +1,8 @@
 package cz.uhk.ordinace.doctor.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
-public record DoctorRequest(@NotBlank String firstName, @NotBlank String lastName) {
+public record DoctorRequest(@NotBlank @Size(max = 100) String firstName,
+        @NotBlank @Size(max = 100) String lastName) {
 }

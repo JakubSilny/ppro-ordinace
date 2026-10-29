@@ -1,6 +1,7 @@
 package cz.uhk.ordinace.visit.repository;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -14,6 +15,8 @@ import cz.uhk.ordinace.visit.dto.ReportLine;
 public interface VisitProcedureRepository extends JpaRepository<VisitProcedure, Long> {
 
     List<VisitProcedure> findByVisitIdOrderById(long visitId);
+
+    List<VisitProcedure> findByVisitIdInOrderById(Collection<Long> visitIds);
 
     boolean existsByVisitIdAndProcedureIdAndVoidedAtIsNull(long visitId, long procedureId);
 

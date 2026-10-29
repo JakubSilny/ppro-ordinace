@@ -3,8 +3,11 @@ package cz.uhk.ordinace.visit.service;
 import java.time.Clock;
 import java.time.YearMonth;
 import java.time.ZoneId;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -65,9 +68,15 @@ public class VisitService {
         return detail(visit);
     }
 
+    /** Návštěvy k rezervacím podle id rezervace; dva dotazy místo dvou na každou rezervaci. */
     @Transactional(readOnly = true)
-    public Optional<VisitDetail> findByAppointment(long appointmentId) {
-        return visits.findByAppointmentId(appointmentId).map(this::detail);
+    public Map<Long, VisitDetail> findByAppointments(Collection<Long> appointmentIds) {
+        List<Visit> found = visits.findByAppointmentIdIn(appointmentIds);
+        Map<Long, List<VisitProcedure>> procedures = visitProcedures
+                .findByVisitIdInOrderById(found.stream().map(Visit::getId).toList()).stream()
+                .collect(Collectors.groupingBy(VisitProcedure::getVisitId));
+        return found.stream().collect(Collectors.toMap(Visit::getAppointmentId,
+                v -> new VisitDetail(v, procedures.getOrDefault(v.getId(), List.of()))));
     }
 
     @Transactional

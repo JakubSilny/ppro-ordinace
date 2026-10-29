@@ -3,6 +3,7 @@ package cz.uhk.ordinace.doctor.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -45,8 +46,10 @@ class DoctorServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new DoctorService(doctors, officeHours, absences, clock);
-        when(doctors.findById(1L)).thenReturn(Optional.of(new Doctor("Marie", "Vyhlídalová")));
+        service = new DoctorService(doctors, officeHours, absences, () -> Optional.of("recepce"), clock);
+        Doctor doctor = new Doctor("Marie", "Vyhlídalová");
+        lenient().when(doctors.findById(1L)).thenReturn(Optional.of(doctor));
+        lenient().when(doctors.findLockedById(1L)).thenReturn(Optional.of(doctor));
     }
 
     private OfficeHoursRequest hours(int day, String from, String to) {
@@ -82,7 +85,7 @@ class DoctorServiceTest {
         Instant start = Instant.parse("2026-06-10T06:00:00Z");
         Instant end = Instant.parse("2026-06-12T15:00:00Z");
         when(absences.save(any())).thenAnswer(i -> i.getArgument(0));
-        when(absences.flagForRebooking(1, start, end)).thenReturn(3);
+        when(absences.flagForRebooking(1, start, end, "recepce")).thenReturn(3);
 
         AbsenceResult result = service.addAbsence(1, new AbsenceRequest(start, end, "Flu"));
 

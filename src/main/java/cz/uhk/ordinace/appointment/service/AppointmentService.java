@@ -134,6 +134,7 @@ public class AppointmentService {
     @Transactional
     public Appointment reschedule(long id, RescheduleRequest req) {
         Appointment old = get(id);
+        doctors.lock(old.getDoctorId()); // zámek lékaře dřív než řádku rezervace, stejně jako při zadání absence
         int minutes = req.durationMinutes() == null
                 ? (int) Duration.between(old.getStartAt(), old.getEndAt()).toMinutes()
                 : req.durationMinutes();
@@ -145,7 +146,8 @@ public class AppointmentService {
 
     private Appointment book(long doctorId, long patientId, Instant start, int minutes, Optional<String> reason,
             Optional<Long> rescheduledFrom) {
-        if (!doctors.get(doctorId).isActive() || !patients.get(patientId).isActive()) {
+        // zámky lékaře a pacienta: absence ani vyřazení se mezi kontrolou a uložením nevklíní
+        if (!doctors.lock(doctorId).isActive() || !patients.lock(patientId).isActive()) {
             throw new BusinessRuleException("Doctor and patient must be active");
         }
         Instant end = start.plus(Duration.ofMinutes(minutes));

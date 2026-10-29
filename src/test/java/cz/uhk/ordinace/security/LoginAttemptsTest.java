@@ -76,4 +76,14 @@ class LoginAttemptsTest {
 
         assertThat(attempts.isLocked("vera")).isFalse();
     }
+
+    @Test
+    void expiredNamesAreForgottenSoGuessingNamesCannotFillMemory() {
+        fail("nahodne1", 1);
+        fail("nahodne2", 1);
+        now = now.plus(LoginAttempts.LOCK);
+        attempts.failed("nahodne3");
+
+        assertThat(attempts.trackedNames()).isEqualTo(1);
+    }
 }
